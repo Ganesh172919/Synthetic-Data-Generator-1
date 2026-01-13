@@ -101,7 +101,6 @@ from langchain_huggingface import HuggingFacePipeline
 # %%
 # LangGraph imports
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
 
 # %%
 # Transformers
@@ -268,10 +267,11 @@ class GenerationBatch(BaseModel):
 # LangGraph State Definition
 class AgentState(TypedDict):
     """State passed between agents in the graph"""
-    requirements: Optional[Dict]
-    schema: Optional[Dict]
-    context: Optional[Dict]
-    current_batch: Optional[Dict]
+    user_input: str
+    requirements: Dict
+    schema: Dict
+    context: Dict
+    current_batch: Dict
     generated_samples: List[Dict]
     quality_scores: List[Dict]
     total_generated: int
@@ -279,7 +279,7 @@ class AgentState(TypedDict):
     errors: List[str]
     current_step: str
     hitl_pause: bool
-    final_output: Optional[str]
+    final_output: str
     consecutive_failed_batches: int
 
 
@@ -1181,9 +1181,8 @@ def create_synth_workflow(llm):
     workflow.add_edge("stop_on_failure", END)
     workflow.add_edge("export", END)
 
-    # Compile with memory
-    memory = MemorySaver()
-    app = workflow.compile(checkpointer=memory)
+    # Compile workflow (no checkpointer needed for simple streaming)
+    app = workflow.compile()
 
     return app, aggregator
 
@@ -1236,13 +1235,13 @@ def run_generation(user_request: str = None, target_samples: int = None):
     # Create workflow
     workflow, aggregator = create_synth_workflow(llm)
 
-    # Initialize state
+    # Initialize state with proper default values (use empty dicts, not None)
     initial_state = {
         "user_input": user_request,
-        "requirements": None,
-        "schema": None,
-        "context": None,
-        "current_batch": None,
+        "requirements": {},
+        "schema": {},
+        "context": {},
+        "current_batch": {},
         "generated_samples": [],
         "quality_scores": [],
         "total_generated": 0,
@@ -1250,13 +1249,12 @@ def run_generation(user_request: str = None, target_samples: int = None):
         "errors": [],
         "current_step": "init",
         "hitl_pause": False,
-        "final_output": None,
+        "final_output": "",
         "consecutive_failed_batches": 0
     }
 
-    # Run with progress tracking
-    thread_id = f"gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    config_run = {"configurable": {"thread_id": thread_id, "recursion_limit": config.TARGET_SAMPLES * 2}}
+    # Run with progress tracking - set reasonable recursion limit
+    config_run = {"recursion_limit": 10000}
 
     start_time = datetime.now()
     last_progress = 0
@@ -1299,24 +1297,28 @@ def run_generation(user_request: str = None, target_samples: int = None):
     df = aggregator.to_dataframe()
     stats = aggregator.get_stats()
 
+    # Calculate rate safely (avoid division by zero)
+    rate = len(df) / elapsed if elapsed > 0 else 0.0
+    avg_quality = stats.get('avg_quality', 0) if stats else 0
+    
     # Display summary
     console.print(Panel.fit(
         f"Generation Complete!\n\n"
         f"Statistics:\n"
         f"   Total samples: {len(df)}\n"
         f"   Time elapsed: {elapsed/60:.1f} minutes\n"
-        f"   Rate: {len(df)/elapsed:.2f} samples/second\n"
-        f"   Avg quality: {stats.get('avg_quality', 0):.2f}/10",
+        f"   Rate: {rate:.2f} samples/second\n"
+        f"   Avg quality: {avg_quality:.2f}/10",
         title="Complete", style="green"
     ))
 
     # Show category distribution
-    if "by_category" in stats:
+    if stats and "by_category" in stats and len(df) > 0:
         print("\n" + "="*60)
         print("CATEGORY DISTRIBUTION")
         print("="*60)
         for cat, count in sorted(stats["by_category"].items(), key=lambda x: -x[1]):
-            pct = 100 * count / len(df)
+            pct = 100 * count / len(df) if len(df) > 0 else 0
             bar = "*" * int(pct / 2)
             print(f"{cat:20s}: {count:5d} ({pct:5.1f}%) {bar}")
 
@@ -1324,9 +1326,9 @@ def run_generation(user_request: str = None, target_samples: int = None):
     print(f"\n{'='*60}")
     print("DIFFICULTY DISTRIBUTION")
     print(f"{'='*60}")
-    if "by_difficulty" in stats:
+    if stats and "by_difficulty" in stats and len(df) > 0:
         for diff, count in stats["by_difficulty"].items():
-            pct = 100 * count / len(df)
+            pct = 100 * count / len(df) if len(df) > 0 else 0
             bar = "*" * int(pct / 2)
             print(f"{diff:15s}: {count:5d} ({pct:5.1f}%) {bar}")
 
