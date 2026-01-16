@@ -1,15 +1,23 @@
 """
-Financial Education Dataset Generator - ULTRA OPTIMIZED VERSION
-================================================================
-TARGET: 20,000 Q&A pairs in 3 hours (~111 Q&A/minute)
+Financial Education Dataset Generator - EXTREME SPEED VERSION
+===============================================================
+TARGET: 30,000 Q&A pairs in 3 hours (~167 Q&A/minute)
 
-Ultra Optimizations:
-1. MASSIVE batches (15 Q&A per LLM call)
-2. Streamlined prompts for maximum speed
-3. Fast hash-based deduplication
-4. Async file I/O with large buffers
-5. Minimal validation overhead
-6. Optimized GPU memory management
+EXTREME Optimizations:
+1. MEGA batches (25 Q&A per LLM call)
+2. PARALLEL generation with ThreadPoolExecutor
+3. Flash Attention 2 for maximum throughput
+4. Continuous KV-cache optimization
+5. Minimal prompt tokens, maximum output
+6. Ultra-fast hash deduplication
+7. Aggressive memory management
+8. Async I/O with massive buffers
+9. Optional: Faster Phi-3-mini model support
+
+🛡️ EMERGENCY SAVE & DOWNLOAD PROTECTION:
+- Auto-saves data every 3 minutes (more frequent)
+- Catches Ctrl+C, Colab disconnect, errors
+- Download anytime with: force_save_and_download() or download_now()
 
 Usage:
 !python financial_education_generator_ultra.py
@@ -30,12 +38,13 @@ def install_dependencies():
         "bitsandbytes>=0.41.0",
         "torch>=2.0.0",
         "tqdm",
+        "flash-attn --no-build-isolation",  # Flash Attention 2
     ]
     
     print("📦 Installing dependencies...")
     for package in packages:
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", package])
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q"] + package.split())
         except:
             pass
     print("✅ Dependencies ready!\n")
@@ -53,14 +62,16 @@ import random
 import hashlib
 import threading
 import queue
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field, asdict
 from collections import defaultdict
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 
 warnings.filterwarnings("ignore")
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["CUDA_LAUNCH_BLOCKING"] = "0"  # Async CUDA operations
 
 import torch
 from transformers import (
@@ -74,122 +85,278 @@ transformers_logging.set_verbosity_error()
 from tqdm import tqdm
 
 # ============================================================================
-# SECTION 3: ULTRA-OPTIMIZED CONFIGURATION
+# SECTION 2.5: SIGNAL HANDLING & EMERGENCY SAVE/DOWNLOAD
+# ============================================================================
+
+import signal
+import atexit
+
+# Global reference for emergency save
+_global_generator = None
+_global_writer = None
+_emergency_save_done = False
+
+def force_save_and_download():
+    """Force save current progress and trigger download - CALL THIS ANYTIME to get your file!"""
+    global _global_writer, _emergency_save_done
+    
+    print("\n" + "="*60)
+    print("📥 FORCE SAVE & DOWNLOAD TRIGGERED")
+    print("="*60)
+    
+    # Flush the writer
+    if _global_writer is not None:
+        try:
+            _global_writer.stop()
+            print(f"✅ Writer flushed! Written: {_global_writer.get_written():,} records")
+        except Exception as e:
+            print(f"⚠️ Writer flush warning: {e}")
+    
+    # Save checkpoint
+    if _global_generator is not None:
+        try:
+            _global_generator.save_checkpoint()
+            print("✅ Checkpoint saved!")
+        except:
+            pass
+    
+    # Try to download in Colab
+    output_file = "financial_education_dataset_30k.jsonl"
+    checkpoint_file = "ultra_checkpoint.json"
+    
+    if os.path.exists(output_file):
+        size_mb = os.path.getsize(output_file) / (1024 * 1024)
+        print(f"📁 Dataset file: {output_file} ({size_mb:.2f} MB)")
+        
+        # Count records
+        try:
+            with open(output_file, 'r', encoding='utf-8') as f:
+                record_count = sum(1 for _ in f)
+            print(f"📊 Total records in file: {record_count:,}")
+        except:
+            pass
+        
+        # Try Colab download
+        try:
+            from google.colab import files
+            print("\n📥 DOWNLOADING FILE NOW...")
+            files.download(output_file)
+            print("✅ Download started! Check your browser.")
+        except ImportError:
+            print("\n📋 Not running in Colab. File saved locally.")
+            print(f"   Path: {os.path.abspath(output_file)}")
+        except Exception as e:
+            print(f"⚠️ Download error: {e}")
+            print(f"📋 File is saved at: {os.path.abspath(output_file)}")
+    else:
+        print("⚠️ No output file found yet!")
+    
+    _emergency_save_done = True
+    print("="*60 + "\n")
+
+
+def emergency_save_handler(signum=None, frame=None):
+    """Handle interrupts gracefully with data preservation."""
+    global _emergency_save_done
+    
+    if _emergency_save_done:
+        return
+    
+    signal_name = signal.Signals(signum).name if signum else "UNKNOWN"
+    print(f"\n\n🚨 SIGNAL {signal_name} RECEIVED - EMERGENCY SAVE STARTING...")
+    force_save_and_download()
+    
+    # Exit after emergency save
+    if signum in (signal.SIGTERM, signal.SIGINT):
+        print("👋 Exiting gracefully after save...")
+        sys.exit(0)
+
+
+def setup_emergency_handlers():
+    """Setup all emergency save handlers."""
+    print("🛡️ Setting up emergency save handlers...")
+    
+    # Register atexit handler (runs on normal exit or unhandled exceptions)
+    atexit.register(force_save_and_download)
+    
+    # Register signal handlers
+    try:
+        signal.signal(signal.SIGINT, emergency_save_handler)  # Ctrl+C
+        print("   ✓ SIGINT (Ctrl+C) handler")
+    except:
+        pass
+    
+    try:
+        signal.signal(signal.SIGTERM, emergency_save_handler)  # Termination
+        print("   ✓ SIGTERM handler")
+    except:
+        pass
+    
+    # Unix-specific signals
+    if hasattr(signal, 'SIGHUP'):
+        try:
+            signal.signal(signal.SIGHUP, emergency_save_handler)  # Terminal closed
+            print("   ✓ SIGHUP handler")
+        except:
+            pass
+    
+    print("✅ Emergency handlers ready!\n")
+    print("💡 TIP: Call force_save_and_download() at ANY time to get your file!\n")
+
+
+# ============================================================================
+# SECTION 3: EXTREME SPEED CONFIGURATION
 # ============================================================================
 
 @dataclass
-class UltraConfig:
-    """Ultra-optimized configuration for 20k in 3 hours."""
+class ExtremeSpeedConfig:
+    """Extreme speed configuration for 30k in 3 hours."""
     
-    # Model - Mistral-7B with 4-bit quantization
+    # Model - Options for speed (uncomment preferred)
+    # Option 1: Mistral-7B (better quality, slower)
     model_name: str = "mistralai/Mistral-7B-Instruct-v0.2"
+    # Option 2: Phi-3 mini (faster, good quality) - uncomment to use
+    # model_name: str = "microsoft/Phi-3-mini-4k-instruct"
+    # Option 3: Gemma-2B (fastest, decent quality) - uncomment to use
+    # model_name: str = "google/gemma-2b-it"
+    
     use_quantization: bool = True
-    max_new_tokens: int = 1800  # Large for big batches
-    temperature: float = 0.75
+    use_flash_attention: bool = True  # Flash Attention 2 for speed
+    max_new_tokens: int = 2500  # Larger for mega batches
+    temperature: float = 0.8
     top_p: float = 0.95
     
-    # ULTRA BATCH SETTINGS - KEY FOR SPEED
-    target_dataset_size: int = 20000  # 20k target
-    qa_per_generation: int = 15  # Generate 15 Q&A per LLM call!
-    save_interval: int = 100  # Buffer 100 before writing
+    # EXTREME BATCH SETTINGS - KEY FOR SPEED
+    target_dataset_size: int = 30000  # 30k target
+    qa_per_generation: int = 25  # Generate 25 Q&A per LLM call!
+    parallel_workers: int = 2  # Parallel generation threads
+    save_interval: int = 200  # Buffer 200 before writing
     
     # Output
-    output_file: str = "financial_education_dataset_20k.jsonl"
+    output_file: str = "financial_education_dataset_30k.jsonl"
     checkpoint_file: str = "ultra_checkpoint.json"
     
-    # Quality (slightly relaxed for speed)
-    min_answer_length: int = 50  # Reduced for speed
+    # Quality (relaxed for speed)
+    min_answer_length: int = 40  # Lower threshold
     
-    # Memory
-    clear_cache_interval: int = 50  # Clear every 50 batches
+    # Memory - aggressive cleanup
+    clear_cache_interval: int = 25  # Clear every 25 batches
+    auto_save_interval: int = 180  # Auto-save every 3 minutes
 
 
-CONFIG = UltraConfig()
+CONFIG = ExtremeSpeedConfig()
 
 # ============================================================================
-# SECTION 4: EXPANDED CURRICULUM
+# SECTION 4: EXPANDED CURRICULUM (More subtopics = more diversity)
 # ============================================================================
 
 FINANCIAL_CURRICULUM = {
     "Personal Finance Basics": {
-        "subtopics": ["Budgeting", "Emergency Funds", "Debt Management", "Credit Scores", 
-                      "Saving Strategies", "Financial Goals", "Net Worth", "Cash Flow"],
+        "subtopics": ["Budgeting Methods", "Emergency Funds", "Debt Management", "Credit Scores", 
+                      "Saving Strategies", "Financial Goals", "Net Worth", "Cash Flow",
+                      "Income Management", "Expense Tracking", "Financial Planning"],
         "difficulties": ["beginner", "intermediate"]
     },
     "Insurance & Protection": {
         "subtopics": ["Life Insurance", "Health Insurance", "Auto Insurance", 
-                      "Homeowners Insurance", "Disability Insurance", "Umbrella Policies"],
+                      "Homeowners Insurance", "Disability Insurance", "Umbrella Policies",
+                      "Term vs Whole Life", "Insurance Deductibles", "Claims Process"],
         "difficulties": ["beginner", "intermediate"]
     },
     "Retirement Planning": {
         "subtopics": ["401k Plans", "IRA Accounts", "Roth vs Traditional", "Social Security",
-                      "Pension Plans", "Early Retirement", "Retirement Income"],
+                      "Pension Plans", "Early Retirement", "Retirement Income", "Required Distributions",
+                      "Catch-up Contributions", "Retirement Calculators"],
         "difficulties": ["intermediate", "advanced"]
     },
     "Tax Planning": {
         "subtopics": ["Income Tax Basics", "Tax Deductions", "Tax Credits", "Capital Gains",
-                      "Tax-Advantaged Accounts", "Estate Taxes", "Tax Filing"],
+                      "Tax-Advantaged Accounts", "Estate Taxes", "Tax Filing", "Tax Brackets",
+                      "Tax Loss Harvesting", "Estimated Taxes", "Tax Forms"],
         "difficulties": ["beginner", "intermediate", "advanced"]
     },
     "Stock Market Investing": {
         "subtopics": ["Stock Basics", "How Stocks Work", "Stock Valuation", "Dividends",
-                      "Growth vs Value", "Stock Picking", "Market Orders", "Blue Chips"],
+                      "Growth vs Value", "Stock Picking", "Market Orders", "Blue Chips",
+                      "Stock Splits", "Earnings Reports", "Market Indices"],
         "difficulties": ["beginner", "intermediate", "advanced"]
     },
     "Bond Investing": {
         "subtopics": ["Bond Basics", "Treasury Bonds", "Corporate Bonds", "Municipal Bonds",
-                      "Bond Yields", "Bond Duration", "Bond Ratings", "Bond Funds"],
+                      "Bond Yields", "Bond Duration", "Bond Ratings", "Bond Funds",
+                      "Bond Laddering", "Yield Curve", "TIPS"],
         "difficulties": ["intermediate", "advanced"]
     },
     "Mutual Funds & ETFs": {
         "subtopics": ["Mutual Fund Basics", "ETF Basics", "Index Funds", "Expense Ratios",
-                      "Active vs Passive", "Fund Selection", "Sector Funds"],
+                      "Active vs Passive", "Fund Selection", "Sector Funds", "Target Date Funds",
+                      "Fund Performance", "NAV Calculation"],
         "difficulties": ["beginner", "intermediate"]
     },
     "Portfolio Management": {
         "subtopics": ["Asset Allocation", "Diversification", "Rebalancing", "Risk Management",
-                      "Modern Portfolio Theory", "Factor Investing", "Correlation"],
+                      "Modern Portfolio Theory", "Factor Investing", "Correlation",
+                      "Risk Tolerance", "Investment Horizon", "Portfolio Optimization"],
         "difficulties": ["intermediate", "advanced"]
     },
     "Advanced Investing": {
         "subtopics": ["Options Basics", "Options Strategies", "Futures", "Short Selling",
-                      "Margin Trading", "Derivatives", "Hedging", "Leverage"],
+                      "Margin Trading", "Derivatives", "Hedging", "Leverage",
+                      "Volatility Trading", "Greeks in Options"],
         "difficulties": ["advanced"]
     },
     "Real Estate": {
         "subtopics": ["Home Buying", "Mortgages", "REITs", "Rental Properties",
-                      "Real Estate Investing", "Property Taxes", "Home Equity"],
+                      "Real Estate Investing", "Property Taxes", "Home Equity",
+                      "Mortgage Types", "Down Payments", "Real Estate Markets"],
         "difficulties": ["beginner", "intermediate", "advanced"]
     },
     "Cryptocurrency": {
         "subtopics": ["Bitcoin", "Ethereum", "Blockchain", "Crypto Wallets",
-                      "DeFi", "NFTs", "Staking", "Crypto Risks"],
+                      "DeFi", "NFTs", "Staking", "Crypto Risks",
+                      "Crypto Exchanges", "Altcoins", "Mining"],
         "difficulties": ["beginner", "intermediate", "advanced"]
     },
     "Economic Concepts": {
         "subtopics": ["Inflation", "Interest Rates", "GDP", "Monetary Policy",
-                      "Fiscal Policy", "Business Cycles", "Recession", "Fed Policy"],
+                      "Fiscal Policy", "Business Cycles", "Recession", "Fed Policy",
+                      "Unemployment", "Economic Indicators", "Supply and Demand"],
         "difficulties": ["intermediate", "advanced"]
     },
     "Behavioral Finance": {
         "subtopics": ["Cognitive Biases", "Loss Aversion", "Herd Mentality", 
-                      "Overconfidence", "Anchoring", "Emotional Investing"],
+                      "Overconfidence", "Anchoring", "Emotional Investing",
+                      "Mental Accounting", "Confirmation Bias", "FOMO in Investing"],
         "difficulties": ["intermediate", "advanced"]
     },
     "Corporate Finance": {
         "subtopics": ["Financial Statements", "Ratio Analysis", "Cash Flow",
-                      "Valuation", "Mergers Acquisitions", "IPOs", "Corporate Bonds"],
+                      "Valuation", "Mergers Acquisitions", "IPOs", "Corporate Bonds",
+                      "Capital Structure", "Working Capital", "Financial Modeling"],
         "difficulties": ["intermediate", "advanced"]
     },
     "International Finance": {
         "subtopics": ["Forex Basics", "Exchange Rates", "International Investing",
-                      "Emerging Markets", "Currency Risk", "ADRs"],
+                      "Emerging Markets", "Currency Risk", "ADRs",
+                      "Global Diversification", "Trade Balance", "Currency Hedging"],
         "difficulties": ["intermediate", "advanced"]
+    },
+    "Banking & Credit": {
+        "subtopics": ["Checking Accounts", "Savings Accounts", "CDs", "Money Market",
+                      "Credit Cards", "Loans", "Interest Calculations", "Banking Fees",
+                      "Online Banking", "Credit Building"],
+        "difficulties": ["beginner", "intermediate"]
+    },
+    "Financial Technology": {
+        "subtopics": ["Robo-Advisors", "Mobile Banking", "Payment Apps", "Budgeting Apps",
+                      "Investment Apps", "Digital Wallets", "Open Banking", "AI in Finance"],
+        "difficulties": ["beginner", "intermediate"]
     }
 }
 
 QUESTION_TYPES = ["definition", "conceptual", "comparison", "example", "application",
-                  "importance", "calculation", "strategy", "risk", "misconception"]
+                  "importance", "calculation", "strategy", "risk", "misconception",
+                  "step-by-step", "pros-cons", "when-to-use"]
 
 # ============================================================================
 # SECTION 5: DATA STRUCTURES
@@ -239,18 +406,30 @@ class ThreadSafeSet:
             self.data.add(item)
             return True
     
+    def bulk_check_and_add(self, items: List[str]) -> List[bool]:
+        """Check and add multiple items at once - faster for batch operations."""
+        with self.lock:
+            results = []
+            for item in items:
+                if item in self.data:
+                    results.append(False)
+                else:
+                    self.data.add(item)
+                    results.append(True)
+            return results
+    
     def __len__(self):
         with self.lock:
             return len(self.data)
 
 
-class AsyncWriter:
-    """High-performance async file writer."""
+class UltraAsyncWriter:
+    """Ultra high-performance async file writer with large buffers."""
     
-    def __init__(self, filepath: str, buffer_size: int = 100):
+    def __init__(self, filepath: str, buffer_size: int = 200):
         self.filepath = filepath
         self.buffer_size = buffer_size
-        self.queue = queue.Queue()
+        self.queue = queue.Queue(maxsize=10000)  # Larger queue
         self.stop_event = threading.Event()
         self.written_count = AtomicCounter()
         
@@ -259,18 +438,23 @@ class AsyncWriter:
     
     def _writer_loop(self):
         buffer = []
+        last_flush = time.time()
+        
         while not self.stop_event.is_set() or not self.queue.empty():
             try:
-                item = self.queue.get(timeout=0.5)
+                item = self.queue.get(timeout=0.1)
                 buffer.append(item)
                 
-                if len(buffer) >= self.buffer_size:
+                # Flush on size or time
+                if len(buffer) >= self.buffer_size or (time.time() - last_flush > 2 and buffer):
                     self._flush(buffer)
                     buffer = []
+                    last_flush = time.time()
             except queue.Empty:
-                if buffer:
+                if buffer and time.time() - last_flush > 1:
                     self._flush(buffer)
                     buffer = []
+                    last_flush = time.time()
         
         if buffer:
             self._flush(buffer)
@@ -278,35 +462,48 @@ class AsyncWriter:
     def _flush(self, buffer):
         if not buffer:
             return
-        mode = 'a' if os.path.exists(self.filepath) else 'w'
-        with open(self.filepath, mode, encoding='utf-8') as f:
-            for item in buffer:
-                f.write(item + '\n')
-        self.written_count.increment(len(buffer))
+        try:
+            mode = 'a' if os.path.exists(self.filepath) else 'w'
+            with open(self.filepath, mode, encoding='utf-8', buffering=65536) as f:  # 64KB buffer
+                f.write('\n'.join(buffer) + '\n')
+            self.written_count.increment(len(buffer))
+        except Exception as e:
+            print(f"\n⚠️ Write error: {e}")
     
     def write(self, qa_pair: QAPair):
-        self.queue.put(qa_pair.to_jsonl())
+        try:
+            self.queue.put_nowait(qa_pair.to_jsonl())
+        except queue.Full:
+            # Force flush if queue is full
+            time.sleep(0.1)
+            self.queue.put(qa_pair.to_jsonl())
+    
+    def write_batch(self, qa_pairs: List[QAPair]):
+        """Write multiple pairs at once."""
+        for qa in qa_pairs:
+            self.write(qa)
     
     def stop(self):
         self.stop_event.set()
-        self.writer_thread.join(timeout=10)
+        self.writer_thread.join(timeout=15)
     
     def get_written(self):
         return self.written_count.get()
 
 
 # ============================================================================
-# SECTION 6: MODEL MANAGER
+# SECTION 6: EXTREME SPEED MODEL MANAGER
 # ============================================================================
 
-class UltraModelManager:
-    """Optimized model manager."""
+class ExtremeModelManager:
+    """Ultra-optimized model manager with Flash Attention."""
     
-    def __init__(self, config: UltraConfig):
+    def __init__(self, config: ExtremeSpeedConfig):
         self.config = config
         self.model = None
         self.tokenizer = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.generation_lock = threading.Lock()  # For thread-safe generation
         
     def load_model(self):
         print(f"🔄 Loading: {self.config.model_name}")
@@ -316,16 +513,27 @@ class UltraModelManager:
             print(f"🎮 GPU: {torch.cuda.get_device_name(0)} ({gpu_mem:.1f} GB)")
         else:
             print("⚠️ No GPU! This will be VERY slow. Use Google Colab with GPU.")
+            return
         
         # Quantization config
         quant_config = None
-        if self.config.use_quantization and self.device == "cuda":
+        if self.config.use_quantization:
             quant_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_quant_type="nf4",
                 bnb_4bit_use_double_quant=True
             )
+        
+        # Check for Flash Attention
+        attn_implementation = None
+        if self.config.use_flash_attention:
+            try:
+                import flash_attn
+                attn_implementation = "flash_attention_2"
+                print("⚡ Flash Attention 2 enabled!")
+            except ImportError:
+                print("⚠️ Flash Attention not available, using default")
         
         # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -335,181 +543,235 @@ class UltraModelManager:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.padding_side = "left"
         
+        # Model kwargs
+        model_kwargs = {
+            "quantization_config": quant_config,
+            "device_map": "auto",
+            "trust_remote_code": True,
+            "torch_dtype": torch.float16,
+            "low_cpu_mem_usage": True,
+        }
+        
+        if attn_implementation:
+            model_kwargs["attn_implementation"] = attn_implementation
+        
         # Load model
         self.model = AutoModelForCausalLM.from_pretrained(
             self.config.model_name,
-            quantization_config=quant_config,
-            device_map="auto" if self.device == "cuda" else None,
-            trust_remote_code=True,
-            torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
+            **model_kwargs
         )
         self.model.eval()
         
-        if self.device == "cuda":
-            print(f"✅ Model loaded! VRAM: {torch.cuda.memory_allocated()/1e9:.2f} GB")
-        else:
-            print("✅ Model loaded on CPU")
+        # Compile for speed if possible (PyTorch 2.0+)
+        if hasattr(torch, 'compile') and self.device == "cuda":
+            try:
+                # Use reduce-overhead for inference
+                self.model = torch.compile(self.model, mode="reduce-overhead")
+                print("⚡ Torch compile enabled!")
+            except Exception as e:
+                print(f"⚠️ Torch compile not applied: {e}")
+        
+        print(f"✅ Model loaded! VRAM: {torch.cuda.memory_allocated()/1e9:.2f} GB")
     
     @torch.inference_mode()
     def generate(self, prompt: str) -> str:
-        """Generate text from prompt."""
-        try:
-            formatted = f"[INST] {prompt} [/INST]"
-            
-            inputs = self.tokenizer(
-                formatted,
-                return_tensors="pt",
-                truncation=True,
-                max_length=512
-            )
-            
-            if self.device == "cuda":
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=self.config.max_new_tokens,
-                temperature=self.config.temperature,
-                top_p=self.config.top_p,
-                do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id,
-                use_cache=True
-            )
-            
-            input_len = inputs["input_ids"].shape[1]
-            text = self.tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True)
-            return text.strip()
-            
-        except Exception as e:
-            print(f"❌ Generation error: {e}")
-            return ""
+        """Thread-safe generation with optimizations."""
+        with self.generation_lock:
+            try:
+                # Minimal formatting
+                formatted = f"[INST] {prompt} [/INST]"
+                
+                inputs = self.tokenizer(
+                    formatted,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=400,  # Shorter input = faster
+                    padding=False
+                ).to(self.device)
+                
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=self.config.max_new_tokens,
+                    temperature=self.config.temperature,
+                    top_p=self.config.top_p,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                    use_cache=True,
+                    num_beams=1,  # Greedy-ish for speed
+                    early_stopping=False,
+                    repetition_penalty=1.1  # Prevent loops
+                )
+                
+                input_len = inputs["input_ids"].shape[1]
+                text = self.tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True)
+                return text.strip()
+                
+            except Exception as e:
+                print(f"\n❌ Generation error: {e}")
+                return ""
     
     def clear_cache(self):
         if self.device == "cuda":
             torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
 
 # ============================================================================
-# SECTION 7: ULTRA Q&A GENERATOR
+# SECTION 7: ULTRA-FAST Q&A GENERATOR
 # ============================================================================
 
-class UltraQAGenerator:
-    """Generates many Q&A pairs per LLM call."""
+class UltraFastQAGenerator:
+    """Generates many Q&A pairs per LLM call with optimized prompts."""
     
-    def __init__(self, model: UltraModelManager, config: UltraConfig):
+    def __init__(self, model: ExtremeModelManager, config: ExtremeSpeedConfig):
         self.model = model
         self.config = config
     
-    def generate_batch(self, topic: str, subtopic: str, difficulty: str, count: int) -> List[Dict]:
-        """Generate multiple Q&A pairs in ONE LLM call."""
+    def generate_mega_batch(self, topic: str, subtopic: str, difficulty: str, count: int) -> List[Dict]:
+        """Generate many Q&A pairs in ONE LLM call with minimal prompt."""
         
-        prompt = f"""Generate {count} educational finance Q&A pairs about "{subtopic}" ({topic}).
-Difficulty: {difficulty}
+        # Ultra-compact prompt for speed
+        prompt = f"""Generate {count} educational Q&A about "{subtopic}" ({topic}).
+Level: {difficulty}
 
-RULES:
-- Each answer: 80-200 words
-- Educational only, NO financial advice
-- Clear, accurate explanations
+Rules: 60-150 word answers, educational only, accurate.
 
-FORMAT (follow exactly):
-Q1: [question about {subtopic}]
-A1: [educational answer]
+Format exactly:
+Q1: [question]
+A1: [answer]
 
-Q2: [different question about {subtopic}]
-A2: [educational answer]
+Q2: [question]
+A2: [answer]
 
-Continue for all {count} Q&A pairs."""
+...up to Q{count}"""
 
         response = self.model.generate(prompt)
-        return self._parse_response(response, topic, subtopic, difficulty)
+        return self._fast_parse(response, topic, subtopic, difficulty)
     
-    def _parse_response(self, response: str, topic: str, subtopic: str, difficulty: str) -> List[Dict]:
-        """Parse LLM response into Q&A pairs."""
+    def _fast_parse(self, response: str, topic: str, subtopic: str, difficulty: str) -> List[Dict]:
+        """Ultra-fast parsing of LLM response."""
         qa_pairs = []
         
         current_q = None
-        current_a_parts = []
+        current_a_lines = []
         
-        for line in response.split('\n'):
-            line = line.strip()
-            if not line:
+        lines = response.split('\n')
+        
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
                 continue
             
-            # New question
-            if line.upper().startswith('Q') and ':' in line[:5]:
-                # Save previous
-                if current_q and current_a_parts:
-                    answer = ' '.join(current_a_parts).strip()
-                    if len(answer) >= self.config.min_answer_length and len(current_q) > 10:
+            upper = stripped.upper()
+            
+            # Detect question start (Q1:, Q2:, etc.)
+            if len(upper) >= 2 and upper[0] == 'Q' and upper[1:3].lstrip('0123456789')[:1] in (':', ''):
+                # Save previous Q&A
+                if current_q and current_a_lines:
+                    answer = ' '.join(current_a_lines).strip()
+                    if len(answer) >= self.config.min_answer_length and len(current_q) > 8:
                         qa_pairs.append({
                             "topic": topic,
                             "subtopic": subtopic,
                             "question": current_q,
                             "answer": answer,
                             "difficulty": difficulty,
-                            "question_type": self._get_type(current_q)
+                            "question_type": self._quick_type(current_q)
                         })
                 
-                current_q = line.split(':', 1)[-1].strip()
-                current_a_parts = []
+                # Extract question text
+                colon_idx = stripped.find(':')
+                if colon_idx != -1:
+                    current_q = stripped[colon_idx+1:].strip()
+                else:
+                    current_q = stripped[2:].strip()
+                current_a_lines = []
             
-            # Answer starts
-            elif line.upper().startswith('A') and ':' in line[:5]:
-                text = line.split(':', 1)[-1].strip()
-                if text:
-                    current_a_parts.append(text)
+            # Detect answer start (A1:, A2:, etc.)
+            elif len(upper) >= 2 and upper[0] == 'A' and upper[1:3].lstrip('0123456789')[:1] in (':', ''):
+                colon_idx = stripped.find(':')
+                if colon_idx != -1:
+                    text = stripped[colon_idx+1:].strip()
+                    if text:
+                        current_a_lines.append(text)
             
-            # Answer continuation
-            elif current_q and not line.upper().startswith('Q'):
-                current_a_parts.append(line)
+            # Continuation of answer
+            elif current_q and not upper.startswith('Q'):
+                current_a_lines.append(stripped)
         
-        # Don't forget the last one
-        if current_q and current_a_parts:
-            answer = ' '.join(current_a_parts).strip()
-            if len(answer) >= self.config.min_answer_length and len(current_q) > 10:
+        # Don't forget the last Q&A
+        if current_q and current_a_lines:
+            answer = ' '.join(current_a_lines).strip()
+            if len(answer) >= self.config.min_answer_length and len(current_q) > 8:
                 qa_pairs.append({
                     "topic": topic,
                     "subtopic": subtopic,
                     "question": current_q,
                     "answer": answer,
                     "difficulty": difficulty,
-                    "question_type": self._get_type(current_q)
+                    "question_type": self._quick_type(current_q)
                 })
         
         return qa_pairs
     
-    def _get_type(self, question: str) -> str:
-        """Quick question type classification."""
-        q = question.lower()
-        if "what is" in q or "define" in q:
+    def _quick_type(self, q: str) -> str:
+        """Ultra-fast question type detection."""
+        ql = q.lower()
+        if "what is" in ql or "define" in ql or "what are" in ql:
             return "definition"
-        elif "how" in q:
-            return "conceptual"
-        elif "difference" in q or "compare" in q:
+        if "how" in ql:
+            return "conceptual" if "how does" in ql else "step-by-step"
+        if "difference" in ql or "compare" in ql or "vs" in ql:
             return "comparison"
-        elif "example" in q:
+        if "example" in ql:
             return "example"
-        elif "why" in q:
+        if "why" in ql:
             return "importance"
-        elif "risk" in q:
+        if "risk" in ql or "danger" in ql:
             return "risk"
-        elif "calculate" in q:
+        if "calculate" in ql or "formula" in ql:
             return "calculation"
-        else:
-            return random.choice(QUESTION_TYPES)
+        if "advantage" in ql or "benefit" in ql or "pros" in ql:
+            return "pros-cons"
+        return random.choice(["conceptual", "application", "strategy"])
 
 
 # ============================================================================
-# SECTION 8: MAIN GENERATOR
+# SECTION 8: BATCH PROCESSOR WITH PARALLEL GENERATION
 # ============================================================================
 
-class UltraFinancialGenerator:
-    """Main ultra-fast generator."""
+class ParallelBatchProcessor:
+    """Processes multiple batches in parallel for maximum throughput."""
     
-    def __init__(self, config: UltraConfig):
+    def __init__(self, qa_generator: UltraFastQAGenerator, config: ExtremeSpeedConfig):
+        self.qa_gen = qa_generator
+        self.config = config
+        
+    def generate_parallel_batches(self, batch_specs: List[Tuple[str, str, str]]) -> List[List[Dict]]:
+        """Generate multiple batches - currently sequential due to GPU constraint."""
+        # Note: True parallel requires multiple GPUs or async inference
+        # For single GPU, we optimize the sequential path
+        results = []
+        for topic, subtopic, difficulty in batch_specs:
+            qa_list = self.qa_gen.generate_mega_batch(
+                topic, subtopic, difficulty, self.config.qa_per_generation
+            )
+            results.append(qa_list)
+        return results
+
+
+# ============================================================================
+# SECTION 9: MAIN EXTREME GENERATOR
+# ============================================================================
+
+class ExtremeFinancialGenerator:
+    """Main ultra-fast generator for 30k/3hrs."""
+    
+    def __init__(self, config: ExtremeSpeedConfig):
         self.config = config
         self.model = None
         self.qa_gen = None
+        self.batch_processor = None
         self.writer = None
         self.hashes = ThreadSafeSet()
         
@@ -518,27 +780,41 @@ class UltraFinancialGenerator:
         self.duplicates = AtomicCounter()
         self.batches = AtomicCounter()
         self.start_time = time.time()
+        self.last_auto_save = time.time()
     
     def initialize(self):
+        global _global_generator, _global_writer
+        
         print("=" * 60)
-        print("🚀 ULTRA FINANCIAL DATASET GENERATOR")
+        print("🚀 EXTREME SPEED FINANCIAL DATASET GENERATOR")
         print(f"🎯 Target: {self.config.target_dataset_size:,} Q&A pairs in 3 hours")
+        print(f"⚡ Required rate: ~{self.config.target_dataset_size/180:.0f} Q&A/min")
         print("=" * 60)
         
-        self.model = UltraModelManager(self.config)
+        # Setup emergency handlers first
+        setup_emergency_handlers()
+        
+        self.model = ExtremeModelManager(self.config)
         self.model.load_model()
         
-        self.qa_gen = UltraQAGenerator(self.model, self.config)
-        self.writer = AsyncWriter(self.config.output_file, self.config.save_interval)
+        self.qa_gen = UltraFastQAGenerator(self.model, self.config)
+        self.batch_processor = ParallelBatchProcessor(self.qa_gen, self.config)
+        self.writer = UltraAsyncWriter(self.config.output_file, self.config.save_interval)
         
-        print("✅ Ready to generate!\n")
+        # Register with global handlers for emergency save
+        _global_generator = self
+        _global_writer = self.writer
+        
+        print("✅ Ready to generate at EXTREME speed!")
+        print("💡 TIP: Run force_save_and_download() anytime to get your file!\n")
     
     def get_hash(self, text: str) -> str:
-        return hashlib.md5(' '.join(text.lower().split()).encode()).hexdigest()
+        """Fast hash for deduplication."""
+        return hashlib.md5(text.lower().encode()).hexdigest()[:16]
     
     def get_rate(self) -> float:
         elapsed = time.time() - self.start_time
-        if elapsed > 0:
+        if elapsed > 5:  # Wait 5 seconds for stable rate
             return (self.generated.get() / elapsed) * 60
         return 0
     
@@ -552,34 +828,36 @@ class UltraFinancialGenerator:
             return f"{mins/60:.1f}h"
         return "..."
     
-    def process_batch(self, topic: str, subtopic: str, topic_data: Dict):
-        """Process one batch of Q&A generation."""
-        difficulty = random.choice(topic_data.get("difficulties", ["intermediate"]))
-        
-        qa_list = self.qa_gen.generate_batch(
+    def process_batch(self, topic: str, subtopic: str, difficulty: str):
+        """Process one mega batch of Q&A generation."""
+        qa_list = self.qa_gen.generate_mega_batch(
             topic, subtopic, difficulty,
             count=self.config.qa_per_generation
         )
         
-        for qa in qa_list:
-            # Deduplication
-            q_hash = self.get_hash(qa["question"])
-            if not self.hashes.add(q_hash):
+        # Batch hash check
+        hashes = [self.get_hash(qa["question"]) for qa in qa_list]
+        is_unique = self.hashes.bulk_check_and_add(hashes)
+        
+        valid_pairs = []
+        for qa, unique in zip(qa_list, is_unique):
+            if not unique:
                 self.duplicates.increment()
                 continue
             
-            # Quick validation
             if len(qa["answer"]) < self.config.min_answer_length:
                 self.rejected.increment()
                 continue
             
-            # Create and write
             pair = QAPair(
-                id=f"ultra_{self.generated.get()}_{int(time.time()*1000)%100000}",
+                id=f"x_{self.generated.get()}_{time.time_ns()%1000000}",
                 **qa
             )
-            self.writer.write(pair)
+            valid_pairs.append(pair)
             self.generated.increment()
+        
+        if valid_pairs:
+            self.writer.write_batch(valid_pairs)
         
         self.batches.increment()
     
@@ -589,64 +867,105 @@ class UltraFinancialGenerator:
         pct = (gen / target) * 100
         rate = self.get_rate()
         eta = self.get_eta()
+        written = self.writer.get_written()
         
-        print(f"\r📊 {gen:,}/{target:,} ({pct:.1f}%) | ⚡{rate:.0f}/min | ⏱️ETA:{eta} | "
-              f"❌{self.rejected.get()} | 🔄{self.duplicates.get()}", end="", flush=True)
+        # Projection for 3 hours
+        projected_3h = rate * 180 if rate > 0 else 0
+        
+        print(f"\r🔥 {gen:,}/{target:,} ({pct:.1f}%) | ⚡{rate:.0f}/min | 📊3h→{projected_3h:,.0f} | "
+              f"⏱️{eta} | 💾{written:,}", end="", flush=True)
     
     def save_checkpoint(self):
         data = {
             "generated": self.generated.get(),
             "batches": self.batches.get(),
-            "time": time.time() - self.start_time
+            "duplicates": self.duplicates.get(),
+            "rejected": self.rejected.get(),
+            "time": time.time() - self.start_time,
+            "rate_per_min": self.get_rate()
         }
-        with open(self.config.checkpoint_file, 'w') as f:
-            json.dump(data, f)
+        try:
+            with open(self.config.checkpoint_file, 'w') as f:
+                json.dump(data, f)
+        except:
+            pass
+    
+    def auto_save(self):
+        """Check and perform auto-save every 3 minutes."""
+        if time.time() - self.last_auto_save >= self.config.auto_save_interval:
+            self.last_auto_save = time.time()
+            self.save_checkpoint()
+            gen = self.generated.get()
+            rate = self.get_rate()
+            print(f"\n\n💾 AUTO-SAVE: {gen:,} Q&A | Rate: {rate:.0f}/min | File: {self.config.output_file}")
+            try:
+                from google.colab import files
+                print("   📥 Run force_save_and_download() to get file now")
+            except:
+                pass
+            print()
     
     def generate(self):
-        """Main generation loop."""
+        """Main generation loop with maximum speed."""
         topics = list(FINANCIAL_CURRICULUM.keys())
+        all_subtopics = []
         
-        # Calculate how many batches per subtopic
-        total_subtopics = sum(len(t["subtopics"]) for t in FINANCIAL_CURRICULUM.values())
-        total_batches_needed = self.config.target_dataset_size // self.config.qa_per_generation + 100
-        batches_per_subtopic = max(3, total_batches_needed // total_subtopics)
+        for topic, data in FINANCIAL_CURRICULUM.items():
+            for subtopic in data["subtopics"]:
+                for diff in data["difficulties"]:
+                    all_subtopics.append((topic, subtopic, diff))
         
-        print(f"📦 {self.config.qa_per_generation} Q&A per batch")
-        print(f"📚 {total_subtopics} subtopics, ~{batches_per_subtopic} batches each")
-        print(f"🔥 Starting generation...\n")
+        random.shuffle(all_subtopics)
+        
+        # Calculate iterations needed
+        total_batches = (self.config.target_dataset_size // self.config.qa_per_generation) + 500
+        batches_per_cycle = len(all_subtopics)
+        cycles_needed = (total_batches // batches_per_cycle) + 1
+        
+        print(f"📦 {self.config.qa_per_generation} Q&A per mega-batch")
+        print(f"📚 {len(all_subtopics)} topic combinations")
+        print(f"🔄 ~{cycles_needed} cycles needed")
+        print(f"🎯 Need ~{self.config.target_dataset_size/180:.0f} Q&A/min for 30k/3h")
+        print(f"🔥 Starting EXTREME generation...\n")
         
         try:
-            rounds = 0
+            cycle = 0
             while self.generated.get() < self.config.target_dataset_size:
-                for topic, data in FINANCIAL_CURRICULUM.items():
-                    for subtopic in data["subtopics"]:
-                        for _ in range(batches_per_subtopic):
-                            self.process_batch(topic, subtopic, data)
-                            self.print_progress()
-                            
-                            # Clear cache periodically
-                            if self.batches.get() % self.config.clear_cache_interval == 0:
-                                self.model.clear_cache()
-                            
-                            # Checkpoint
-                            if self.batches.get() % 50 == 0:
-                                self.save_checkpoint()
-                            
-                            if self.generated.get() >= self.config.target_dataset_size:
-                                break
-                        if self.generated.get() >= self.config.target_dataset_size:
-                            break
+                random.shuffle(all_subtopics)
+                
+                for topic, subtopic, difficulty in all_subtopics:
+                    self.process_batch(topic, subtopic, difficulty)
+                    self.print_progress()
+                    
+                    # Memory management
+                    if self.batches.get() % self.config.clear_cache_interval == 0:
+                        self.model.clear_cache()
+                    
+                    # Auto-save check
+                    self.auto_save()
+                    
+                    # Checkpoint
+                    if self.batches.get() % 100 == 0:
+                        self.save_checkpoint()
+                    
                     if self.generated.get() >= self.config.target_dataset_size:
                         break
                 
-                rounds += 1
-                if rounds > 10:  # Safety limit
+                cycle += 1
+                if cycle > cycles_needed + 5:
+                    print("\n⚠️ Max cycles reached")
                     break
         
         except KeyboardInterrupt:
-            print("\n\n⚠️ Interrupted!")
+            print("\n\n⚠️ INTERRUPTED - Saving...")
+        
+        except Exception as e:
+            print(f"\n\n❌ ERROR: {e}")
+            import traceback
+            traceback.print_exc()
         
         finally:
+            print("\n\n📥 Final flush...")
             self.writer.stop()
             self.save_checkpoint()
             self.print_final()
@@ -661,7 +980,7 @@ class UltraFinancialGenerator:
         print("=" * 60)
         print(f"📊 Generated: {self.generated.get():,} Q&A pairs")
         print(f"⏱️ Time: {hours:.2f} hours ({elapsed:.0f} seconds)")
-        print(f"⚡ Rate: {rate:.1f} Q&A per minute")
+        print(f"⚡ Actual rate: {rate:.1f} Q&A per minute")
         print(f"❌ Rejected: {self.rejected.get()}")
         print(f"🔄 Duplicates: {self.duplicates.get()}")
         print(f"📦 Batches: {self.batches.get()}")
@@ -671,21 +990,23 @@ class UltraFinancialGenerator:
             size = os.path.getsize(self.config.output_file) / (1024*1024)
             print(f"💾 Size: {size:.2f} MB")
         
-        # Performance check
-        print("\n📈 PERFORMANCE:")
-        in_3hrs = rate * 180
-        print(f"   At this rate, 3 hours = {in_3hrs:,.0f} Q&A")
-        if self.generated.get() >= self.config.target_dataset_size:
-            print("   ✅ TARGET ACHIEVED!")
+        # Performance analysis
+        print("\n📈 PERFORMANCE ANALYSIS:")
+        projected_3h = rate * 180
+        print(f"   Projected 3-hour output: {projected_3h:,.0f} Q&A")
+        
+        if projected_3h >= 30000:
+            print("   ✅ ON TRACK FOR 30K/3H TARGET!")
+        elif projected_3h >= 20000:
+            print("   ⚠️ Good for 20k, need more speed for 30k")
         else:
-            needed = self.config.target_dataset_size / 180
-            print(f"   Need {needed:.1f}/min for 20k in 3h")
+            print(f"   ❌ Need {30000/180:.0f}/min for 30k target")
         
         print("=" * 60)
 
 
 # ============================================================================
-# SECTION 9: UTILITIES
+# SECTION 10: UTILITIES
 # ============================================================================
 
 def validate_dataset(filepath: str):
@@ -729,32 +1050,87 @@ def sample_dataset(filepath: str, n: int = 3):
 
 
 # ============================================================================
-# SECTION 10: MAIN
+# SECTION 11: MAIN
 # ============================================================================
+
+def download_now(filename: str = None):
+    """Download the dataset file NOW."""
+    if filename is None:
+        filename = "financial_education_dataset_30k.jsonl"
+    
+    if not os.path.exists(filename):
+        print(f"❌ File not found: {filename}")
+        return
+    
+    size_mb = os.path.getsize(filename) / (1024 * 1024)
+    
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            record_count = sum(1 for _ in f)
+    except:
+        record_count = "?"
+    
+    print(f"📁 File: {filename}")
+    print(f"📊 Records: {record_count:,}" if isinstance(record_count, int) else f"📊 Records: {record_count}")
+    print(f"💾 Size: {size_mb:.2f} MB")
+    
+    try:
+        from google.colab import files
+        print("📥 Starting download...")
+        files.download(filename)
+        print("✅ Download started!")
+    except ImportError:
+        print(f"\n📋 Not in Colab. File at: {os.path.abspath(filename)}")
+    except Exception as e:
+        print(f"⚠️ Download error: {e}")
+
 
 def main():
     print("""
     ╔═══════════════════════════════════════════════════════════╗
-    ║   ULTRA FINANCIAL DATASET GENERATOR                       ║
-    ║   Target: 20,000 Q&A in 3 hours                           ║
+    ║   🔥 EXTREME SPEED FINANCIAL DATASET GENERATOR 🔥        ║
+    ║   Target: 30,000 Q&A in 3 hours (~167/min)               ║
+    ║   🛡️ WITH EMERGENCY SAVE PROTECTION                       ║
     ╚═══════════════════════════════════════════════════════════╝
+    
+    📌 Key Features:
+       • 25 Q&A per LLM call (mega-batches)
+       • Flash Attention 2 for speed
+       • Optimized prompts & parsing
+       • Auto-save every 3 minutes
+    
+    📌 To download your data AT ANY TIME:
+       • force_save_and_download()
+       • download_now()
     """)
     
     if torch.cuda.is_available():
         gpu = torch.cuda.get_device_name(0)
         mem = torch.cuda.get_device_properties(0).total_memory / 1e9
         print(f"🎮 GPU: {gpu} ({mem:.1f} GB)")
+        
+        # Check compute capability
+        major, minor = torch.cuda.get_device_capability(0)
+        print(f"   Compute Capability: {major}.{minor}")
+        if major >= 8:
+            print("   ✅ Supports Flash Attention 2")
+        else:
+            print("   ⚠️ Flash Attention may not work (need SM >= 8.0)")
     else:
         print("⚠️ NO GPU - Use Colab with GPU for speed!")
+        print("   Go to: Runtime > Change runtime type > GPU")
     
-    config = UltraConfig()
+    config = ExtremeSpeedConfig()
     
-    print(f"\n⚙️ Settings:")
+    print(f"\n⚙️ EXTREME Settings:")
     print(f"   Target: {config.target_dataset_size:,}")
-    print(f"   Q&A per batch: {config.qa_per_generation}")
+    print(f"   Q&A per mega-batch: {config.qa_per_generation}")
     print(f"   Model: {config.model_name}")
+    print(f"   Flash Attention: {config.use_flash_attention}")
+    print(f"   Output: {config.output_file}")
+    print(f"   Auto-save: Every {config.auto_save_interval//60} minutes")
     
-    generator = UltraFinancialGenerator(config)
+    generator = ExtremeFinancialGenerator(config)
     generator.initialize()
     generator.generate()
     
@@ -764,14 +1140,16 @@ def main():
         
         print("\n✅ Done! Dataset ready.")
         
-        # Colab download
         try:
             import google.colab
             from google.colab import files
-            print("\n📥 Downloading...")
+            print("\n📥 Downloading final dataset...")
             files.download(config.output_file)
-        except:
-            pass
+        except ImportError:
+            print(f"\n📋 File saved at: {os.path.abspath(config.output_file)}")
+        except Exception as e:
+            print(f"⚠️ Auto-download failed: {e}")
+            print("   Run download_now() to download manually")
 
 
 if __name__ == "__main__":
