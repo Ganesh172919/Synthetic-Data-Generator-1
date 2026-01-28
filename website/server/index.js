@@ -12,6 +12,7 @@ app.use(express.json());
 // In-memory storage (for demo purposes)
 const jobs = new Map();
 const domains = new Map();
+const jobIntervals = new Map(); // Track intervals for cleanup
 
 // Default templates
 const templates = [
@@ -98,16 +99,41 @@ app.get('/api/templates/:id', (req, res) => {
   res.json(template);
 });
 
+// Validation helpers
+const validDomains = ['financial', 'healthcare', 'legal', 'technology', 'science', 'education', 'custom'];
+const validOutputFormats = ['jsonl', 'csv', 'parquet'];
+
 // Start generation job
 app.post('/api/generate', (req, res) => {
   const { domain, targetCount, batchSize, outputFormat } = req.body;
+  
+  // Input validation
+  if (!domain || typeof domain !== 'string') {
+    return res.status(400).json({ error: 'Domain is required and must be a string' });
+  }
+  if (!validDomains.includes(domain)) {
+    return res.status(400).json({ error: `Invalid domain. Must be one of: ${validDomains.join(', ')}` });
+  }
+  
+  const parsedTargetCount = parseInt(targetCount) || 1000;
+  const parsedBatchSize = parseInt(batchSize) || 25;
+  
+  if (parsedTargetCount < 100 || parsedTargetCount > 100000) {
+    return res.status(400).json({ error: 'Target count must be between 100 and 100000' });
+  }
+  if (parsedBatchSize < 5 || parsedBatchSize > 50) {
+    return res.status(400).json({ error: 'Batch size must be between 5 and 50' });
+  }
+  if (outputFormat && !validOutputFormats.includes(outputFormat)) {
+    return res.status(400).json({ error: `Invalid output format. Must be one of: ${validOutputFormats.join(', ')}` });
+  }
   
   const jobId = `gen_${uuidv4().substring(0, 8)}`;
   const job = {
     id: jobId,
     domain,
-    targetCount: targetCount || 1000,
-    batchSize: batchSize || 25,
+    targetCount: parsedTargetCount,
+    batchSize: parsedBatchSize,
     outputFormat: outputFormat || 'jsonl',
     status: 'running',
     generated: 0,
@@ -123,7 +149,7 @@ app.post('/api/generate', (req, res) => {
   res.json({
     jobId,
     status: 'running',
-    estimatedTime: `${Math.ceil(targetCount / 100)} minutes`
+    estimatedTime: `${Math.ceil(parsedTargetCount / 100)} minutes`
   });
 });
 
@@ -147,11 +173,31 @@ app.get('/api/jobs', (req, res) => {
 // Save custom domain
 app.post('/api/domains', (req, res) => {
   const domainConfig = req.body;
+  
+  // Input validation
+  if (!domainConfig || typeof domainConfig !== 'object') {
+    return res.status(400).json({ error: 'Domain configuration is required' });
+  }
+  if (!domainConfig.name || typeof domainConfig.name !== 'string' || domainConfig.name.trim().length === 0) {
+    return res.status(400).json({ error: 'Domain name is required' });
+  }
+  if (domainConfig.name.length > 100) {
+    return res.status(400).json({ error: 'Domain name must be less than 100 characters' });
+  }
+  if (!domainConfig.topics || !Array.isArray(domainConfig.topics) || domainConfig.topics.length === 0) {
+    return res.status(400).json({ error: 'At least one topic is required' });
+  }
+  
   const domainId = `domain_${uuidv4().substring(0, 8)}`;
   
   const domain = {
     id: domainId,
-    ...domainConfig,
+    name: domainConfig.name.trim(),
+    description: domainConfig.description || '',
+    topics: domainConfig.topics,
+    questionTypes: domainConfig.questionTypes || ['definition'],
+    difficultyLevels: domainConfig.difficultyLevels || ['beginner'],
+    outputSettings: domainConfig.outputSettings || {},
     createdAt: new Date().toISOString()
   };
   
@@ -183,10 +229,17 @@ function simulateProgress(jobId) {
   const job = jobs.get(jobId);
   if (!job) return;
   
+  // Clear any existing interval for this job
+  if (jobIntervals.has(jobId)) {
+    clearInterval(jobIntervals.get(jobId));
+    jobIntervals.delete(jobId);
+  }
+  
   const interval = setInterval(() => {
     const currentJob = jobs.get(jobId);
     if (!currentJob || currentJob.status !== 'running') {
       clearInterval(interval);
+      jobIntervals.delete(jobId);
       return;
     }
     
@@ -198,10 +251,14 @@ function simulateProgress(jobId) {
       currentJob.status = 'completed';
       currentJob.downloadUrl = `/api/downloads/${jobId}.jsonl`;
       clearInterval(interval);
+      jobIntervals.delete(jobId);
     }
     
     jobs.set(jobId, currentJob);
   }, 2000);
+  
+  // Store interval for cleanup
+  jobIntervals.set(jobId, interval);
 }
 
 // Start server

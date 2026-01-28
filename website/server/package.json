@@ -8,7 +8,11 @@
     "dev": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["synthetic-data", "api", "dataset-generation"],
+  "keywords": [
+    "synthetic-data",
+    "api",
+    "dataset-generation"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
