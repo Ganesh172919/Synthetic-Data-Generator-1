@@ -45,46 +45,53 @@ _From 30,000 Q&A pairs in 3 hours on a FREE Google Colab T4 GPU—to unlimited p
 
 ---
 
-## 🌐 Upcoming Website
+## 🌐 Full-Stack Web Application
 
-> 🚧 **Coming Soon** — A beautiful, interactive web platform!
+> ✅ **NOW AVAILABLE** — Interactive web platform for synthetic data generation!
 
-We're building a modern web application to make synthetic data generation accessible to everyone. Here's what's planned:
+We've built a complete full-stack application that makes synthetic data generation accessible through an intuitive web interface.
 
-### 🎨 Website Features
+### 🎨 Platform Features
 
 | Feature                   | Description                                     | Status     |
 | ------------------------- | ----------------------------------------------- | ---------- |
-| **Interactive Dashboard** | Real-time generation monitoring with live stats | 🔜 Planned |
-| **Custom Domain Builder** | Visual interface to define any dataset domain   | 🔜 Planned |
-| **Cloud Generation**      | Run generation jobs in the cloud without Colab  | 🔜 Planned |
-| **Dataset Marketplace**   | Share and discover community-generated datasets | 🔜 Planned |
-| **API Access**            | RESTful API for programmatic dataset generation | 🔜 Planned |
-| **Export Options**        | One-click export to Hugging Face, CSV, Parquet  | 🔜 Planned |
-| **Premium Templates**     | Pre-built templates for popular ML use cases    | 🔜 Planned |
-| **Team Collaboration**    | Share projects and datasets with your team      | 🔜 Planned |
+| **Interactive Dashboard** | Real-time generation monitoring with live stats | ✅ Available |
+| **Custom Domain Builder** | Visual interface to define any dataset domain   | ✅ Available |
+| **Template Library**      | 6 pre-built templates for common use cases      | ✅ Available |
+| **Job Management**        | Start, monitor, pause, and download datasets   | ✅ Available |
+| **API Access**            | RESTful API for programmatic dataset generation | ✅ Available |
+| **Multiple Formats**      | Export to JSONL, JSON, or CSV                   | ✅ Available |
+| **Progress Tracking**     | Real-time progress with rate and ETA            | ✅ Available |
+| **Checkpoint Resume**     | Resume interrupted generation jobs              | ✅ Available |
 
-### 🛠️ Tech Stack (Planned)
+### 🛠️ Tech Stack
 
 ```
 Frontend:     React + Vite + TailwindCSS
-Backend:      Node.js / FastAPI
-Database:     PostgreSQL + Redis
-Cloud:        AWS / GCP (GPU instances)
-Auth:         NextAuth / Clerk
-Deployment:   Vercel + Docker
+Backend:      Node.js + Express
+Generator:    Python + Mistral-7B-Instruct
+Storage:      Local filesystem (cloud-ready)
+Integration:  Python subprocess with JSON events
 ```
 
-### 📅 Development Timeline
+### 🚀 Quick Start - Full Stack
 
-| Phase       | Milestone                        | Target  |
-| ----------- | -------------------------------- | ------- |
-| **Phase 1** | Landing Page & Documentation     | Q1 2026 |
-| **Phase 2** | Core Web UI + Local Generation   | Q2 2026 |
-| **Phase 3** | Cloud Generation + API           | Q3 2026 |
-| **Phase 4** | Marketplace + Community Features | Q4 2026 |
+See **[SETUP.md](SETUP.md)** for complete installation instructions.
 
-> 💡 **Want to contribute to the website?** See our [Contributing](#-contributing) section!
+**TL;DR:**
+
+```bash
+# 1. Install Python dependencies
+cd Pre-Work && pip install transformers accelerate bitsandbytes torch tqdm
+
+# 2. Start backend server
+cd ../server && npm install && npm start
+
+# 3. Start frontend (new terminal)
+cd ../website/client && npm install && npm run dev
+```
+
+Then open http://localhost:5173 in your browser!
 
 ---
 
@@ -142,35 +149,124 @@ Synthetic Data Generator/
 │   ├── universal_dataset_generator.py           # 🌍 Universal domain generator
 │   └── OPTIMIZATION_GUIDE.md                    # 📖 Performance tuning guide
 │
-├── 📂 website/                               # 🔜 Coming Soon - Web Platform
-│   ├── client/                                  # React frontend
-│   └── server/                                  # Backend API
+├── 📂 server/                                # ✅ Backend API Server (NEW!)
+│   ├── server.js                                # Express API with Python integration
+│   ├── generator_runner.py                      # Python subprocess wrapper
+│   ├── package.json                             # Node.js dependencies
+│   ├── test-integration.js                      # Integration tests
+│   └── data/                                    # Generated datasets (gitignored)
 │
+├── 📂 website/                               # ✅ Web Application
+│   ├── client/                                  # React frontend
+│   │   ├── src/
+│   │   │   ├── pages/                           # Dashboard, Templates, Domain Builder
+│   │   │   ├── components/                      # Reusable UI components
+│   │   │   ├── services/                        # API client
+│   │   │   └── App.jsx                          # Main app component
+│   │   ├── package.json                         # Frontend dependencies
+│   │   └── vite.config.js                       # Vite configuration with proxy
+│   │
+│   └── server/                                  # Legacy (use /server instead)
+│
+├── 📄 SETUP.md                               # 📖 Complete setup guide
 ├── 📄 Readme.md                              # You are here!
 └── 📄 LICENSE                                # MIT License
 ```
 
-### 📊 Generator Comparison
+### 📊 Component Comparison
 
-| Version             | Speed  | Target     | Best For                           |
-| ------------------- | ------ | ---------- | ---------------------------------- |
-| **Ultra (Finance)** | 🚀🚀🚀 | 30k/3hrs   | Maximum speed, financial education |
-| **Universal**       | 🌍⚡⚡ | Any domain | Custom datasets, research          |
+| Component          | Purpose                         | Status      |
+| ------------------ | ------------------------------- | ----------- |
+| **Python Generators** | Core dataset generation      | ✅ Production |
+| **Backend Server**    | API + Python integration     | ✅ Complete  |
+| **Frontend UI**       | Web interface                | ✅ Complete  |
+| **Integration**       | Full-stack communication     | ✅ Working   |
+
+---
+
+## 🔌 API Reference
+
+The backend server provides a RESTful API for programmatic dataset generation. See `server/README.md` for full documentation.
+
+### Quick API Examples
+
+**Start a generation job:**
+```bash
+curl -X POST http://localhost:3001/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain": "technology",
+    "targetCount": 1000,
+    "batchSize": 25,
+    "outputFormat": "jsonl",
+    "domainDescription": "Python programming tutorials",
+    "topics": ["Functions", "Classes", "Async/Await"]
+  }'
+```
+
+**Check job status:**
+```bash
+curl http://localhost:3001/api/jobs/{jobId}
+```
+
+**Download dataset:**
+```bash
+curl -O http://localhost:3001/api/downloads/{jobId}/dataset_{jobId}.jsonl
+```
+
+### Available Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Server health check |
+| `GET` | `/api/templates` | List available templates |
+| `POST` | `/api/generate` | Start generation job |
+| `GET` | `/api/jobs/:jobId` | Get job status |
+| `GET` | `/api/jobs` | List all jobs |
+| `POST` | `/api/jobs/:jobId/stop` | Stop a running job |
+| `GET` | `/api/downloads/:jobId/:filename` | Download dataset |
+| `POST` | `/api/domains` | Save custom domain |
+| `GET` | `/api/domains` | List custom domains |
 
 ---
 
 ## 🏗️ System Architecture
 
-Our generator employs multiple cutting-edge optimization strategies:
+Our full-stack platform integrates a modern web UI with high-performance Python generators:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    SYNTHETIC DATA GENERATOR                         │
-├─────────────────────────────────────────────────────────────────────┤
+│                      WEB BROWSER (Client)                           │
+│                   React + Vite + TailwindCSS                        │
+│                    http://localhost:5173                            │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ HTTP/REST API
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   EXPRESS API SERVER (Backend)                      │
+│                    Node.js + Express + CORS                         │
+│                    http://localhost:3001/api                        │
+│                                                                     │
+│  • Job Management     • Template Library    • Progress Tracking    │
+│  • File Storage       • Domain Builder      • Download Manager     │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ Python Subprocess (child_process.spawn)
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   GENERATOR RUNNER (Python Bridge)                  │
+│                      generator_runner.py                            │
+│                                                                     │
+│  • Parse JSON config  • Emit progress events  • Error handling     │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ Import & Execute
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│               UNIVERSAL DATASET GENERATOR (Core)                    │
+│                  universal_dataset_generator.py                     │
 │                                                                     │
 │    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐        │
-│    │   Topic      │───▶│   Batch      │───▶│    LLM       │        │
-│    │  Selection   │    │   Prompt     │    │  Inference   │        │
+│    │   Prompt     │───▶│   Batch      │───▶│   Mistral    │        │
+│    │   Builder    │    │  Processing  │    │  7B-Instruct │        │
 │    └──────────────┘    └──────────────┘    └──────────────┘        │
 │                                                   │                 │
 │                                                   ▼                 │
@@ -179,6 +275,13 @@ Our generator employs multiple cutting-edge optimization strategies:
 │    │  File Write  │    │   Engine     │    │   Pipeline   │        │
 │    └──────────────┘    └──────────────┘    └──────────────┘        │
 │                                                                     │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ Save to disk
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    GENERATED DATASETS                               │
+│               server/data/outputs/*.jsonl                           │
+│                    (JSONL / CSV / JSON)                             │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

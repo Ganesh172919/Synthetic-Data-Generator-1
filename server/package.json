@@ -1,0 +1,30 @@
+{
+  "name": "synthgen-server",
+  "version": "1.0.0",
+  "description": "Backend API server for Synthetic Data Generator with Python integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test-integration.js",
+    "test:quick": "echo \"Quick API test - ensure server is running first\" && node test-integration.js"
+  },
+  "keywords": [
+    "synthetic-data",
+    "api",
+    "dataset-generation",
+    "mistral",
+    "machine-learning"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.1.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "axios": "^1.6.0"
+  }
+}
