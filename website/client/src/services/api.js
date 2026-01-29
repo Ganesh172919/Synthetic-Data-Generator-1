@@ -40,6 +40,9 @@ export const api = {
 
   // Stop a job
   stopJob: async (jobId) => {
+    if (!jobId || typeof jobId !== 'string') {
+      throw new Error('Invalid jobId');
+    }
     const response = await fetch(`${API_BASE}/jobs/${jobId}/stop`, {
       method: 'POST'
     });
@@ -48,6 +51,12 @@ export const api = {
 
   // Download dataset
   getDownloadUrl: (jobId, filename) => {
+    if (!jobId || typeof jobId !== 'string') {
+      throw new Error('Invalid jobId');
+    }
+    if (!filename || typeof filename !== 'string' || filename.includes('..')) {
+      throw new Error('Invalid filename');
+    }
     return `${API_BASE}/downloads/${jobId}/${filename}`;
   },
 
@@ -59,6 +68,9 @@ export const api = {
 
   // Get template by ID
   getTemplate: async (templateId) => {
+    if (!templateId || typeof templateId !== 'string') {
+      throw new Error('Invalid templateId');
+    }
     const response = await fetch(`${API_BASE}/templates/${templateId}`);
     return handleResponse(response);
   },
@@ -75,6 +87,9 @@ export const api = {
 
   // Get domain by ID
   getDomain: async (domainId) => {
+    if (!domainId || typeof domainId !== 'string') {
+      throw new Error('Invalid domainId');
+    }
     const response = await fetch(`${API_BASE}/domains/${domainId}`);
     return handleResponse(response);
   },

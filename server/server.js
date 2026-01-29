@@ -181,6 +181,42 @@ app.post('/api/generate', async (req, res) => {
       return res.status(400).json({ error: `Invalid output format. Must be one of: ${validOutputFormats.join(', ')}` });
     }
     
+    // Validate domainDescription
+    if (domainDescription && typeof domainDescription === 'string' && domainDescription.length > 1000) {
+      return res.status(400).json({ error: 'Domain description must be less than 1000 characters' });
+    }
+    
+    // Validate topics array
+    if (topics && Array.isArray(topics)) {
+      for (const topic of topics) {
+        if (typeof topic !== 'string' || topic.trim().length === 0) {
+          return res.status(400).json({ error: 'All topics must be non-empty strings' });
+        }
+        if (topic.length > 200) {
+          return res.status(400).json({ error: 'Topic must be less than 200 characters' });
+        }
+      }
+    }
+    
+    // Validate temperature
+    const parsedTemperature = typeof temperature === 'number' ? temperature : 0.8;
+    if (parsedTemperature < 0 || parsedTemperature > 2.0) {
+      return res.status(400).json({ error: 'Temperature must be between 0 and 2.0' });
+    }
+    
+    // Validate modelName (basic format check)
+    const allowedModels = [
+      'mistralai/Mistral-7B-Instruct-v0.2',
+      'microsoft/phi-2',
+      'google/gemma-2b'
+    ];
+    const parsedModelName = modelName || 'mistralai/Mistral-7B-Instruct-v0.2';
+    if (!allowedModels.includes(parsedModelName)) {
+      return res.status(400).json({ 
+        error: `Model must be one of: ${allowedModels.join(', ')}` 
+      });
+    }
+    
     const jobId = `gen_${uuidv4().substring(0, 8)}`;
     const outputFileName = `dataset_${jobId}`;
     const configFile = path.join(CONFIGS_DIR, `${jobId}_config.json`);
@@ -204,15 +240,20 @@ app.post('/api/generate', async (req, res) => {
       outputFormat: outputFormat || 'jsonl',
       domainDescription: domainDescription || `${domain} dataset`,
       topics: topics || [],
-      modelName: modelName || 'mistralai/Mistral-7B-Instruct-v0.2',
-      temperature: temperature || 0.8,
+      modelName: parsedModelName,
+      temperature: parsedTemperature,
       useQuantization: useQuantization !== false,
       checkpointFile: path.join(CHECKPOINTS_DIR, `${jobId}_checkpoint.json`),
       saveInterval: 100
     };
     
     // Save config file
-    await fs.writeFile(configFile, JSON.stringify(generatorConfig, null, 2));
+    try {
+      await fs.writeFile(configFile, JSON.stringify(generatorConfig, null, 2));
+    } catch (error) {
+      console.error('Failed to save config file:', error);
+      return res.status(500).json({ error: 'Failed to save configuration', details: error.message });
+    }
     
     // Create job record
     const job = {
@@ -230,7 +271,8 @@ app.post('/api/generate', async (req, res) => {
       estimatedTimeRemaining: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      logs: []
+      logs: [],
+      maxLogs: 100  // Limit log entries to prevent memory issues
     };
     
     jobs.set(jobId, job);
@@ -291,10 +333,14 @@ function startGeneratorProcess(jobId, configFile, generatorType) {
       }
     }
     
-    // Add to job logs
+    // Add to job logs with size limit
     const currentJob = jobs.get(jobId);
     if (currentJob) {
       currentJob.logs.push({ timestamp: new Date().toISOString(), type: 'info', message: output.trim() });
+      // Keep only the most recent maxLogs entries
+      if (currentJob.logs.length > currentJob.maxLogs) {
+        currentJob.logs = currentJob.logs.slice(-currentJob.maxLogs);
+      }
     }
   });
   
@@ -316,6 +362,10 @@ function startGeneratorProcess(jobId, configFile, generatorType) {
     const currentJob = jobs.get(jobId);
     if (currentJob) {
       currentJob.logs.push({ timestamp: new Date().toISOString(), type: 'error', message: output.trim() });
+      // Keep only the most recent maxLogs entries
+      if (currentJob.logs.length > currentJob.maxLogs) {
+        currentJob.logs = currentJob.logs.slice(-currentJob.maxLogs);
+      }
     }
   });
   
@@ -457,11 +507,24 @@ app.get('/api/downloads/:jobId/:filename', async (req, res) => {
     return res.status(404).json({ error: 'Job not found' });
   }
   
-  const filePath = path.join(OUTPUTS_DIR, filename);
+  // Sanitize filename to prevent path traversal
+  const sanitizedFilename = path.basename(filename);
+  if (sanitizedFilename !== filename || filename.includes('..')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  
+  const filePath = path.join(OUTPUTS_DIR, sanitizedFilename);
+  
+  // Verify the resolved path is within OUTPUTS_DIR
+  const resolvedPath = path.resolve(filePath);
+  const resolvedOutputDir = path.resolve(OUTPUTS_DIR);
+  if (!resolvedPath.startsWith(resolvedOutputDir)) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
   
   try {
     await fs.access(filePath);
-    res.download(filePath, filename);
+    res.download(filePath, sanitizedFilename);
   } catch (error) {
     res.status(404).json({ error: 'File not found', details: error.message });
   }

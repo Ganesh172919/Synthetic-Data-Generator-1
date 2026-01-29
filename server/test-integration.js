@@ -165,9 +165,11 @@ async function runTests() {
     // Note: This test will likely timeout or fail if Python/GPU not available
     // That's OK - we're just testing the API layer
     results.total++;
-    if (await testJobStatus(jobId)) results.passed++; else results.failed++;
+    const statusSuccess = await testJobStatus(jobId);
+    if (statusSuccess) results.passed++; else results.failed++;
   } else {
     results.failed++;
+    // Skip job status test if creation failed
   }
   
   // Test 6: Jobs List

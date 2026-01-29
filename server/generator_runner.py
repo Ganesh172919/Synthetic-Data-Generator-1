@@ -19,8 +19,10 @@ import json
 import argparse
 import signal
 import traceback
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 # Add Pre-Work directory to Python path
 SCRIPT_DIR = Path(__file__).parent.absolute()
@@ -33,7 +35,7 @@ def emit_progress(event_type: str, data: Dict[str, Any]):
     """Emit progress events as JSON to stdout for Node.js to parse."""
     progress_event = {
         "type": event_type,
-        "timestamp": __import__('datetime').datetime.now().isoformat(),
+        "timestamp": datetime.now().isoformat(),
         "data": data
     }
     # Print to stdout with flush to ensure immediate delivery
@@ -47,7 +49,7 @@ def emit_error(error_type: str, message: str, details: Optional[str] = None):
         "error_type": error_type,
         "message": message,
         "details": details,
-        "timestamp": __import__('datetime').datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat()
     }
     print(f"ERROR:{json.dumps(error_event)}", file=sys.stderr, flush=True)
 
@@ -143,14 +145,15 @@ Generate diverse, educational content that covers these topics comprehensively."
             # Emit our progress event
             current = generator.generated.get()
             total = gen_config.target_size
-            elapsed = __import__('time').time() - generator.start_time
+            elapsed = time.time() - (generator.start_time or time.time())
             rate = current / elapsed if elapsed > 0 else 0
+            percentage = (current / total * 100) if total > 0 else 0
             
             emit_progress("progress", {
                 "current": current,
                 "total": total,
                 "rate": rate,
-                "percentage": (current / total * 100) if total > 0 else 0,
+                "percentage": percentage,
                 "batch_num": batch_num,
                 "duplicates": generator.duplicates.get(),
                 "errors": generator.errors.get()
