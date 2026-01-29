@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
@@ -9,9 +10,38 @@ const fsSync = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Rate limiting configuration
+const createRateLimiter = (windowMs, max, message) => rateLimit({
+  windowMs,
+  max,
+  message: { error: message },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting
+const generalLimiter = createRateLimiter(
+  15 * 60 * 1000, // 15 minutes
+  100, // Max 100 requests per 15 minutes
+  'Too many requests from this IP, please try again later'
+);
+
+const generationLimiter = createRateLimiter(
+  60 * 60 * 1000, // 1 hour
+  10, // Max 10 generation jobs per hour
+  'Too many generation requests, please try again later'
+);
+
+const downloadLimiter = createRateLimiter(
+  15 * 60 * 1000, // 15 minutes
+  50, // Max 50 downloads per 15 minutes
+  'Too many download requests, please try again later'
+);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/api/', generalLimiter); // Apply to all API routes
 
 // Storage paths
 const DATA_DIR = path.join(__dirname, '../data');
@@ -145,7 +175,7 @@ const validDomains = ['financial', 'healthcare', 'legal', 'technology', 'science
 const validOutputFormats = ['jsonl', 'csv', 'json'];
 
 // Start generation job
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', generationLimiter, async (req, res) => {
   const { 
     domain, 
     targetCount, 
@@ -499,7 +529,7 @@ app.post('/api/jobs/:jobId/stop', (req, res) => {
 });
 
 // Download generated dataset
-app.get('/api/downloads/:jobId/:filename', async (req, res) => {
+app.get('/api/downloads/:jobId/:filename', downloadLimiter, async (req, res) => {
   const { jobId, filename } = req.params;
   const job = jobs.get(jobId);
   
