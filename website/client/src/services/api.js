@@ -10,6 +10,12 @@ const handleResponse = async (response) => {
 };
 
 export const api = {
+  // Health check
+  checkHealth: async () => {
+    const response = await fetch(`${API_BASE}/health`);
+    return handleResponse(response);
+  },
+
   // Generate dataset
   startGeneration: async (config) => {
     const response = await fetch(`${API_BASE}/generate`, {
@@ -26,9 +32,34 @@ export const api = {
     return handleResponse(response);
   },
 
+  // List all jobs
+  listJobs: async () => {
+    const response = await fetch(`${API_BASE}/jobs`);
+    return handleResponse(response);
+  },
+
+  // Stop a job
+  stopJob: async (jobId) => {
+    const response = await fetch(`${API_BASE}/jobs/${jobId}/stop`, {
+      method: 'POST'
+    });
+    return handleResponse(response);
+  },
+
+  // Download dataset
+  getDownloadUrl: (jobId, filename) => {
+    return `${API_BASE}/downloads/${jobId}/${filename}`;
+  },
+
   // List templates
   getTemplates: async () => {
     const response = await fetch(`${API_BASE}/templates`);
+    return handleResponse(response);
+  },
+
+  // Get template by ID
+  getTemplate: async (templateId) => {
+    const response = await fetch(`${API_BASE}/templates/${templateId}`);
     return handleResponse(response);
   },
 
@@ -45,6 +76,12 @@ export const api = {
   // Get domain by ID
   getDomain: async (domainId) => {
     const response = await fetch(`${API_BASE}/domains/${domainId}`);
+    return handleResponse(response);
+  },
+
+  // List all domains
+  listDomains: async () => {
+    const response = await fetch(`${API_BASE}/domains`);
     return handleResponse(response);
   }
 };
