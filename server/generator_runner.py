@@ -68,15 +68,17 @@ def run_universal_generator(config: Dict[str, Any]) -> int:
     
     Args:
         config: Configuration dictionary with keys:
-            - target_size: Number of items to generate
-            - items_per_batch: Items per batch
-            - output_file: Output filename
-            - output_format: jsonl, csv, or json
-            - domain_description: Natural language description
+            - targetSize: Number of items to generate
+            - batchSize: Items per batch
+            - outputFile: Output filename
+            - outputFormat: jsonl, csv, or json
+            - domainDescription: Natural language description
             - topics: List of topics
-            - difficulty_levels: List of difficulty levels
-            - model_name: Optional model name override
-            - checkpoint_file: Optional checkpoint file path
+            - modelName: Optional model name override
+            - checkpointFile: Optional checkpoint file path
+            - temperature: Generation temperature
+            - useQuantization: Whether to use model quantization
+            - saveInterval: How often to save checkpoints
             
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -104,51 +106,76 @@ def run_universal_generator(config: Dict[str, Any]) -> int:
             temperature=config.get("temperature", 0.8),
             checkpoint_file=config.get("checkpointFile", "generator_checkpoint.json"),
             save_interval=config.get("saveInterval", 100),
+            provider=ModelProvider.HUGGINGFACE  # Default to HuggingFace
         )
         
         # Create prompt from domain description
         domain_desc = config.get("domainDescription", "General knowledge Q&A")
         topics = config.get("topics", [])
         
-        user_prompt = f"""Generate a high-quality dataset for: {domain_desc}
+        if topics:
+            user_prompt = f"""Generate a high-quality dataset for: {domain_desc}
 
 Topics to cover:
 {chr(10).join(f"- {topic}" for topic in topics)}
 
 Generate diverse, educational content that covers these topics comprehensively."""
+        else:
+            user_prompt = f"Generate a high-quality dataset for: {domain_desc}"
         
         emit_progress("init", {"message": "Starting generation", "config": {
             "target_size": gen_config.target_size,
             "batch_size": gen_config.items_per_batch,
-            "output_format": gen_config.output_format
+            "output_format": gen_config.output_format,
+            "model": gen_config.model_name
         }})
         
         # Initialize generator
-        generator = UniversalGenerator(config=gen_config, user_prompt=user_prompt)
+        generator = UniversalGenerator(config=gen_config)
         
-        # Custom progress callback
-        original_update = None
+        # Monkey-patch the progress printer to emit our events
+        original_print_progress = generator._print_progress
         
-        def progress_callback(current: int, total: int, rate: float):
+        def custom_print_progress(batch_num: int):
+            # Call original
+            original_print_progress(batch_num)
+            
+            # Emit our progress event
+            current = generator.generated.get()
+            total = gen_config.target_size
+            elapsed = __import__('time').time() - generator.start_time
+            rate = current / elapsed if elapsed > 0 else 0
+            
             emit_progress("progress", {
                 "current": current,
                 "total": total,
                 "rate": rate,
-                "percentage": (current / total * 100) if total > 0 else 0
+                "percentage": (current / total * 100) if total > 0 else 0,
+                "batch_num": batch_num,
+                "duplicates": generator.duplicates.get(),
+                "errors": generator.errors.get()
             })
         
-        # Monkey-patch progress reporting if possible
-        # This is a simplified approach; actual implementation depends on generator structure
+        generator._print_progress = custom_print_progress
         
-        emit_progress("start", {"message": "Generation started"})
+        emit_progress("start", {"message": "Generation started", "prompt": user_prompt[:100]})
         
-        # Run the generator
-        result = generator.run()
+        # Run the generator with the user prompt
+        # Note: run() handles interactive mode, so we pass parameters directly
+        generator.run(
+            user_prompt=user_prompt,
+            parse_mode="qa",  # Default to Q&A format
+            extra_fields=None
+        )
+        
+        # Get final output file path
+        output_path = generator._get_output_path()
         
         emit_progress("complete", {
             "message": "Generation completed successfully",
-            "output_file": result.get("output_file") if isinstance(result, dict) else gen_config.output_file,
-            "total_generated": gen_config.target_size
+            "output_file": output_path,
+            "total_generated": generator.generated.get(),
+            "duplicates_skipped": generator.duplicates.get()
         })
         
         return 0
