@@ -170,6 +170,111 @@ app.get('/api/jobs', (req, res) => {
   res.json({ jobs: allJobs });
 });
 
+// Stop a running job
+app.post('/api/jobs/:jobId/stop', (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  
+  if (job.status !== 'running') {
+    return res.status(400).json({ error: 'Job is not running' });
+  }
+  
+  // Clear the interval if running
+  if (jobIntervals.has(req.params.jobId)) {
+    clearInterval(jobIntervals.get(req.params.jobId));
+    jobIntervals.delete(req.params.jobId);
+  }
+  
+  job.status = 'stopped';
+  job.updatedAt = new Date().toISOString();
+  jobs.set(req.params.jobId, job);
+  
+  res.json({ message: 'Job stopped successfully', job });
+});
+
+// Delete a job
+app.delete('/api/jobs/:jobId', (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  
+  // Clear interval if exists
+  if (jobIntervals.has(req.params.jobId)) {
+    clearInterval(jobIntervals.get(req.params.jobId));
+    jobIntervals.delete(req.params.jobId);
+  }
+  
+  jobs.delete(req.params.jobId);
+  res.json({ message: 'Job deleted successfully' });
+});
+
+// Download generated dataset (mock)
+app.get('/api/downloads/:jobId/:format', (req, res) => {
+  const { jobId, format } = req.params;
+  const job = jobs.get(jobId);
+  
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  
+  if (job.status !== 'completed') {
+    return res.status(400).json({ error: 'Job is not completed yet' });
+  }
+  
+  // Generate mock data based on job configuration
+  const mockData = generateMockDataset(job);
+  
+  res.setHeader('Content-Disposition', `attachment; filename="${jobId}.${format}"`);
+  
+  if (format === 'jsonl') {
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.send(mockData.map(item => JSON.stringify(item)).join('\n'));
+  } else if (format === 'csv') {
+    res.setHeader('Content-Type', 'text/csv');
+    const headers = Object.keys(mockData[0]).join(',');
+    const rows = mockData.map(item => Object.values(item).map(v => `"${v}"`).join(','));
+    res.send([headers, ...rows].join('\n'));
+  } else {
+    res.setHeader('Content-Type', 'application/json');
+    res.json(mockData);
+  }
+});
+
+// Helper function to generate mock dataset
+function generateMockDataset(job) {
+  const sampleSize = Math.min(job.generated, 100); // Return max 100 samples
+  const data = [];
+  
+  const topics = {
+    financial: ['Investing', 'Budgeting', 'Credit', 'Retirement', 'Taxes'],
+    healthcare: ['Symptoms', 'Treatments', 'Prevention', 'Wellness', 'Nutrition'],
+    legal: ['Contracts', 'Rights', 'Compliance', 'Litigation', 'IP'],
+    technology: ['Programming', 'AI/ML', 'Cloud', 'Security', 'DevOps'],
+    science: ['Physics', 'Chemistry', 'Biology', 'Research', 'Data'],
+    education: ['Math', 'Science', 'Language', 'History', 'Arts'],
+    custom: ['Topic 1', 'Topic 2', 'Topic 3', 'Topic 4', 'Topic 5']
+  };
+  
+  const domainTopics = topics[job.domain] || topics.custom;
+  
+  for (let i = 0; i < sampleSize; i++) {
+    const topic = domainTopics[i % domainTopics.length];
+    data.push({
+      id: `${job.domain}_${i + 1}`,
+      topic: topic,
+      question: `Sample question about ${topic} #${i + 1}?`,
+      answer: `This is a comprehensive answer about ${topic}. It provides detailed information and insights relevant to the ${job.domain} domain.`,
+      difficulty: ['beginner', 'intermediate', 'advanced'][i % 3],
+      created_at: new Date().toISOString()
+    });
+  }
+  
+  return data;
+}
+
 // Save custom domain
 app.post('/api/domains', (req, res) => {
   const domainConfig = req.body;

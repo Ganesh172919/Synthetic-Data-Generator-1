@@ -34,12 +34,13 @@ website/
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 
 ### Installation
 
 1. **Install frontend dependencies:**
+
    ```bash
    cd website/client
    npm install
@@ -56,18 +57,21 @@ website/
 **Option 1: Run both servers separately**
 
 Terminal 1 - Backend:
+
 ```bash
 cd website/server
 npm start
 ```
 
 Terminal 2 - Frontend:
+
 ```bash
 cd website/client
 npm run dev
 ```
 
 **Option 2: Using concurrent processes**
+
 ```bash
 # From website directory
 npm run dev
@@ -78,6 +82,7 @@ The frontend will be available at `http://localhost:5173` and the API at `http:/
 ## 🌐 Features
 
 ### Landing Page
+
 - Hero section with key value propositions
 - Feature highlights
 - Performance benchmarks
@@ -85,6 +90,7 @@ The frontend will be available at `http://localhost:5173` and the API at `http:/
 - Call-to-action sections
 
 ### Dashboard
+
 - Real-time generation monitoring
 - Progress tracking with live stats
 - Job management
@@ -92,12 +98,14 @@ The frontend will be available at `http://localhost:5173` and the API at `http:/
 - Export functionality
 
 ### Templates
+
 - Pre-built domain templates
 - Search and filtering
 - Template ratings and download counts
 - Featured templates section
 
 ### Domain Builder
+
 - Custom domain configuration
 - Topic and subtopic management
 - Question type selection
@@ -105,6 +113,7 @@ The frontend will be available at `http://localhost:5173` and the API at `http:/
 - Live preview panel
 
 ### Documentation
+
 - Getting started guide
 - Quick start instructions
 - API reference
@@ -113,16 +122,20 @@ The frontend will be available at `http://localhost:5173` and the API at `http:/
 
 ## 📡 API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/templates` | List all templates |
-| GET | `/api/templates/:id` | Get template by ID |
-| POST | `/api/generate` | Start generation job |
-| GET | `/api/jobs/:jobId` | Get job status |
-| GET | `/api/jobs` | List all jobs |
-| POST | `/api/domains` | Save custom domain |
-| GET | `/api/domains/:id` | Get domain by ID |
+| Method | Endpoint                        | Description                         |
+| ------ | ------------------------------- | ----------------------------------- |
+| GET    | `/api/health`                   | Health check                        |
+| GET    | `/api/templates`                | List all templates                  |
+| GET    | `/api/templates/:id`            | Get template by ID                  |
+| POST   | `/api/generate`                 | Start generation job                |
+| GET    | `/api/jobs/:jobId`              | Get job status                      |
+| GET    | `/api/jobs`                     | List all jobs                       |
+| POST   | `/api/jobs/:jobId/stop`         | Stop a running job                  |
+| DELETE | `/api/jobs/:jobId`              | Delete a job                        |
+| GET    | `/api/downloads/:jobId/:format` | Download dataset (jsonl, csv, json) |
+| POST   | `/api/domains`                  | Save custom domain                  |
+| GET    | `/api/domains/:id`              | Get domain by ID                    |
+| GET    | `/api/domains`                  | List all domains                    |
 
 ## 🎨 UI Components
 

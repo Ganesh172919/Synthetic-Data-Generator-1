@@ -49,15 +49,27 @@ export const api = {
     return handleResponse(response);
   },
 
-  // Download dataset
-  getDownloadUrl: (jobId, filename) => {
+  // Delete a job
+  deleteJob: async (jobId) => {
     if (!jobId || typeof jobId !== 'string') {
       throw new Error('Invalid jobId');
     }
-    if (!filename || typeof filename !== 'string' || filename.includes('..')) {
-      throw new Error('Invalid filename');
+    const response = await fetch(`${API_BASE}/jobs/${jobId}`, {
+      method: 'DELETE'
+    });
+    return handleResponse(response);
+  },
+
+  // Download dataset
+  getDownloadUrl: (jobId, format = 'jsonl') => {
+    if (!jobId || typeof jobId !== 'string') {
+      throw new Error('Invalid jobId');
     }
-    return `${API_BASE}/downloads/${jobId}/${filename}`;
+    const validFormats = ['jsonl', 'csv', 'json'];
+    if (!validFormats.includes(format)) {
+      throw new Error('Invalid format. Use jsonl, csv, or json');
+    }
+    return `${API_BASE}/downloads/${jobId}/${format}`;
   },
 
   // List templates

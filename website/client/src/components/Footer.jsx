@@ -1,5 +1,6 @@
 import { Database, Github, Twitter, Mail, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTheme } from '../hooks/useTheme';
 
 /**
  * Footer Component
@@ -12,12 +13,18 @@ import { Link } from 'react-router-dom';
  * - Hover states for links
  * - Responsive layout
  * - Consistent spacing
+ * - Theme-aware styling
  */
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const { isDark } = useTheme();
   
   return (
-    <footer className="bg-slate-900/50 border-t border-slate-700/30">
+    <footer className={`border-t ${
+      isDark 
+        ? 'bg-slate-900/50 border-slate-700/30' 
+        : 'bg-slate-50/80 border-slate-200'
+    }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 lg:gap-12">
           {/* Brand */}

@@ -51,9 +51,16 @@ const Navbar = () => {
     <nav 
       className={`
         fixed top-0 w-full z-50
-        bg-slate-900/80 backdrop-blur-xl
+        backdrop-blur-xl
         border-b transition-all duration-300
-        ${scrolled ? 'border-slate-700/50 shadow-lg shadow-black/10' : 'border-transparent'}
+        ${isDark 
+          ? 'bg-slate-900/80' 
+          : 'bg-white/80'}
+        ${scrolled 
+          ? isDark 
+            ? 'border-slate-700/50 shadow-lg shadow-black/10' 
+            : 'border-slate-200 shadow-lg shadow-slate-200/50'
+          : 'border-transparent'}
       `}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -82,15 +89,17 @@ const Navbar = () => {
                   font-medium text-sm
                   transition-all duration-200
                   ${isActive(link.path)
-                    ? 'text-white'
-                    : 'text-gray-400 hover:text-white'
+                    ? isDark ? 'text-white' : 'text-slate-900'
+                    : isDark 
+                      ? 'text-gray-400 hover:text-white hover:bg-white/5' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }
                 `}
               >
                 {link.label}
                 {/* Active indicator */}
                 {isActive(link.path) && (
-                  <span className="absolute inset-0 bg-purple-500/15 rounded-lg border border-purple-500/20" />
+                  <span className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
                 )}
               </Link>
             ))}
@@ -101,7 +110,11 @@ const Navbar = () => {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200"
+              className={`p-2.5 rounded-xl transition-all duration-200 ${
+                isDark 
+                  ? 'text-gray-400 hover:text-white hover:bg-white/5' 
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+              }`}
               aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
             >
               <div className="relative w-5 h-5">

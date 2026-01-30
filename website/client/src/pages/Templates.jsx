@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Briefcase, Heart, Scale, Cpu, FlaskConical, GraduationCap,
-  ArrowRight, Search, Star, Download, Sparkles
+  ArrowRight, Search, Star, Download, Sparkles, Eye
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
 import { SkeletonTemplateCard } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
+import Modal from '../components/ui/Modal';
 import { AnimatedSection } from '../hooks/useIntersectionObserver';
 
 /**
@@ -29,6 +31,7 @@ const Templates = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [previewTemplate, setPreviewTemplate] = useState(null);
 
   const categories = [
     { id: 'all', name: 'All Templates', icon: <Sparkles className="w-4 h-4" /> },
@@ -207,7 +210,11 @@ const Templates = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredTemplates.map((template, index) => (
                 <AnimatedSection key={template.id} animation="fade-up" delay={index * 50}>
-                  <TemplateCard template={template} featured />
+                  <TemplateCard 
+                    template={template} 
+                    featured 
+                    onPreview={() => setPreviewTemplate(template)}
+                  />
                 </AnimatedSection>
               ))}
             </div>
@@ -229,7 +236,10 @@ const Templates = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {regularTemplates.map((template, index) => (
                 <AnimatedSection key={template.id} animation="fade-up" delay={index * 50}>
-                  <TemplateCard template={template} />
+                  <TemplateCard 
+                    template={template} 
+                    onPreview={() => setPreviewTemplate(template)}
+                  />
                 </AnimatedSection>
               ))}
             </div>
@@ -271,11 +281,88 @@ const Templates = () => {
           </Card>
         </AnimatedSection>
       </div>
+      
+      {/* Quick Preview Modal */}
+      <Modal
+        isOpen={!!previewTemplate}
+        onClose={() => setPreviewTemplate(null)}
+        title={previewTemplate?.name}
+        maxWidth="lg"
+      >
+        <div className="space-y-6">
+          <div className="flex items-start space-x-4">
+            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
+               {previewTemplate && (
+                  previewTemplate.options?.icon || <Briefcase className="w-8 h-8" />
+               )}
+            </div>
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <Badge variant="outline">{previewTemplate?.category}</Badge>
+                {previewTemplate?.featured && (
+                  <Badge variant="primary">Featured</Badge>
+                )}
+              </div>
+              <p className="text-gray-300 text-lg leading-relaxed">
+                {previewTemplate?.description}
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+            <div>
+               <div className="text-sm text-gray-400 mb-1">Downloads</div>
+               <div className="text-xl font-semibold flex items-center">
+                 <Download className="w-4 h-4 mr-2 text-blue-400" />
+                 {previewTemplate?.downloads?.toLocaleString()}
+               </div>
+            </div>
+            <div>
+               <div className="text-sm text-gray-400 mb-1">Rating</div>
+               <div className="text-xl font-semibold flex items-center">
+                 <Star className="w-4 h-4 mr-2 text-yellow-400" />
+                 {previewTemplate?.rating}
+               </div>
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="font-medium text-gray-300 mb-3">Included Topics</h4>
+            <div className="flex flex-wrap gap-2">
+              {previewTemplate?.topics?.map((topic, i) => (
+                <span key={i} className="px-3 py-1 bg-slate-700/50 rounded-lg text-sm text-gray-300 border border-slate-700">
+                  {topic}
+                </span>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex space-x-3 pt-4 border-t border-slate-700/50">
+            <Button
+              variant="primary"
+              className="flex-1"
+              onClick={() => {
+                // Handle use template
+                setPreviewTemplate(null);
+                // would navigate to dashboard or generation
+              }}
+            >
+              Use Template
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setPreviewTemplate(null)}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
 
-const TemplateCard = ({ template, featured = false }) => {
+const TemplateCard = ({ template, featured = false, onPreview }) => {
   const getCategoryIcon = (category) => {
     const icons = {
       financial: <Briefcase className="w-5 h-5" />,
@@ -292,7 +379,7 @@ const TemplateCard = ({ template, featured = false }) => {
     <Card 
       hover 
       variant={featured ? 'featured' : 'default'}
-      className="h-full flex flex-col group"
+      className="h-full flex flex-col group relative"
     >
       {featured && (
         <Badge variant="warning" size="sm" className="mb-3 w-fit">
@@ -336,13 +423,22 @@ const TemplateCard = ({ template, featured = false }) => {
           <Download className="w-4 h-4" />
           <span>{template.downloads.toLocaleString()}</span>
         </div>
-        <Link
-          to={`/dashboard?template=${template.id}`}
-          className="flex items-center space-x-1 text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors group/link"
-        >
-          <span>Use Template</span>
-          <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
-        </Link>
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={onPreview}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors border border-transparent hover:border-slate-600"
+            title="Quick Preview"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          <Link
+            to={`/dashboard?template=${template.id}`}
+            className="flex items-center space-x-1 text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors group/link"
+          >
+            <span>Use Template</span>
+            <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
+          </Link>
+        </div>
       </div>
     </Card>
   );
