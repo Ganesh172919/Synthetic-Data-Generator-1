@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 
 /**
@@ -65,6 +65,10 @@ const Modal = ({
     const focusableElements = modalRef.current.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
+    
+    // Guard: Don't set up focus trap if no focusable elements
+    if (focusableElements.length === 0) return;
+    
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
@@ -95,13 +99,13 @@ const Modal = ({
     }
   }, [closeOnBackdrop, onClose]);
 
-  const sizes = useMemo(() => ({
+  const sizes = {
     sm: 'max-w-md',
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
     full: 'max-w-[95vw] md:max-w-[90vw]'
-  }), []);
+  };
 
   if (!isOpen) return null;
 

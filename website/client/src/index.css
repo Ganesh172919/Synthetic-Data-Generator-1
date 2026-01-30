@@ -19,7 +19,14 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar styling */
+/* Note: WebKit browsers (Chrome, Safari, Edge) use ::-webkit-scrollbar */
+/* Firefox uses scrollbar-width and scrollbar-color */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

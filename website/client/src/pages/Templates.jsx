@@ -46,13 +46,12 @@ const Templates = () => {
         const response = await fetch('/api/templates');
         const data = await response.json();
         setTemplates(data.templates);
+        setIsLoading(false);
       } catch (error) {
         console.error('Failed to fetch templates:', error);
         // Fallback to default templates
         setTemplates(defaultTemplates);
-      } finally {
-        // Add slight delay for better UX
-        setTimeout(() => setIsLoading(false), 800);
+        setIsLoading(false);
       }
     };
     fetchTemplates();
