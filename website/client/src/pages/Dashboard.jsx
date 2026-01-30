@@ -1,12 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Play, Pause, Download, RefreshCw, Clock, 
   TrendingUp, Database, CheckCircle, AlertCircle,
-  Settings, FileText, Zap
+  Settings, FileText, Zap, AlertTriangle
 } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import Progress from '../components/ui/Progress';
+import Badge from '../components/ui/Badge';
+import { Select } from '../components/ui/Input';
+import Input from '../components/ui/Input';
+import { SkeletonStatsCard, SkeletonProgress } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
+import { AnimatedSection } from '../hooks/useIntersectionObserver';
 
+/**
+ * Dashboard Component
+ * 
+ * The main control center for dataset generation with real-time
+ * progress monitoring, job management, and configuration.
+ * 
+ * UX Improvements:
+ * - Skeleton loaders during initial load
+ * - Improved empty states with guidance
+ * - Toast notifications for feedback
+ * - Better visual hierarchy
+ * - Responsive stat cards
+ */
 const Dashboard = () => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [generationConfig, setGenerationConfig] = useState({
     domain: 'financial',
     targetCount: 1000,
@@ -20,25 +43,48 @@ const Dashboard = () => {
     quality: 99.2
   });
   const [jobs, setJobs] = useState([]);
+  const { toast } = useToast();
+
+  // Simulate initial loading
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Simulate real-time generation
   useEffect(() => {
     let interval;
     if (isGenerating && stats.generated < generationConfig.targetCount) {
       interval = setInterval(() => {
-        setStats(prev => ({
-          ...prev,
-          generated: Math.min(prev.generated + Math.floor(Math.random() * 10) + 5, generationConfig.targetCount),
-          rate: Math.floor(Math.random() * 30) + 140,
-          elapsed: prev.elapsed + 1,
-          quality: 99.2 + (Math.random() * 0.6 - 0.3)
-        }));
+        setStats(prev => {
+          const newGenerated = Math.min(prev.generated + Math.floor(Math.random() * 10) + 5, generationConfig.targetCount);
+          
+          // Completion notification
+          if (newGenerated >= generationConfig.targetCount && prev.generated < generationConfig.targetCount) {
+            toast.success('Generation Complete!', {
+              title: 'Success',
+              duration: 5000
+            });
+            setIsGenerating(false);
+            setJobs(prevJobs => prevJobs.map((job, i) => 
+              i === 0 ? { ...job, status: 'completed' } : job
+            ));
+          }
+          
+          return {
+            ...prev,
+            generated: newGenerated,
+            rate: Math.floor(Math.random() * 30) + 140,
+            elapsed: prev.elapsed + 1,
+            quality: 99.2 + (Math.random() * 0.6 - 0.3)
+          };
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isGenerating, stats.generated, generationConfig.targetCount]);
+  }, [isGenerating, stats.generated, generationConfig.targetCount, toast]);
 
-  const handleStartGeneration = async () => {
+  const handleStartGeneration = useCallback(async () => {
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -48,7 +94,7 @@ const Dashboard = () => {
       const data = await response.json();
       
       setJobs(prev => [{
-        id: data.jobId,
+        id: data.jobId || `job-${Date.now()}`,
         domain: generationConfig.domain,
         target: generationConfig.targetCount,
         status: 'running',
@@ -57,19 +103,50 @@ const Dashboard = () => {
       
       setIsGenerating(true);
       setStats({ generated: 0, rate: 0, elapsed: 0, quality: 99.2 });
+      
+      toast.success(`Started generating ${generationConfig.targetCount.toLocaleString()} items`, {
+        title: 'Generation Started'
+      });
     } catch (error) {
       console.error('Failed to start generation:', error);
+      
+      // Fallback for demo - start anyway
+      setJobs(prev => [{
+        id: `job-${Date.now()}`,
+        domain: generationConfig.domain,
+        target: generationConfig.targetCount,
+        status: 'running',
+        created: new Date().toLocaleString()
+      }, ...prev]);
+      
+      setIsGenerating(true);
+      setStats({ generated: 0, rate: 0, elapsed: 0, quality: 99.2 });
+      
+      toast.info('Running in demo mode', {
+        title: 'Demo Mode'
+      });
     }
-  };
+  }, [generationConfig, toast]);
 
-  const handleStopGeneration = () => {
+  const handleStopGeneration = useCallback(() => {
     setIsGenerating(false);
     if (jobs.length > 0) {
       setJobs(prev => prev.map((job, i) => 
-        i === 0 ? { ...job, status: 'paused' } : job
+        i === 0 && job.status === 'running' ? { ...job, status: 'paused' } : job
       ));
     }
-  };
+    toast.warning('Generation paused', {
+      title: 'Paused'
+    });
+  }, [jobs.length, toast]);
+
+  const handleReset = useCallback(() => {
+    setStats({ generated: 0, rate: 0, elapsed: 0, quality: 99.2 });
+    setIsGenerating(false);
+    toast.info('Progress reset', {
+      title: 'Reset'
+    });
+  }, [toast]);
 
   const formatTime = (seconds) => {
     const h = Math.floor(seconds / 3600);
@@ -78,54 +155,90 @@ const Dashboard = () => {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progress = (stats.generated / generationConfig.targetCount) * 100;
+  const domainOptions = [
+    { value: 'financial', label: 'Financial Education' },
+    { value: 'healthcare', label: 'Healthcare' },
+    { value: 'legal', label: 'Legal' },
+    { value: 'technology', label: 'Technology' },
+    { value: 'science', label: 'Science' },
+    { value: 'custom', label: 'Custom Domain' }
+  ];
+
+  const formatOptions = [
+    { value: 'jsonl', label: 'JSONL' },
+    { value: 'csv', label: 'CSV' },
+    { value: 'parquet', label: 'Parquet' }
+  ];
+
+  // Stat card data
+  const statCards = [
+    {
+      label: 'Generated',
+      value: stats.generated.toLocaleString(),
+      subtext: `of ${generationConfig.targetCount.toLocaleString()} target`,
+      icon: <Database className="w-5 h-5" />,
+      iconColor: 'text-purple-400'
+    },
+    {
+      label: 'Speed',
+      value: isGenerating ? stats.rate : '--',
+      subtext: 'pairs / minute',
+      icon: <TrendingUp className="w-5 h-5" />,
+      iconColor: 'text-emerald-400'
+    },
+    {
+      label: 'Elapsed Time',
+      value: formatTime(stats.elapsed),
+      subtext: 'running time',
+      icon: <Clock className="w-5 h-5" />,
+      iconColor: 'text-blue-400',
+      mono: true
+    },
+    {
+      label: 'Quality Score',
+      value: `${stats.quality.toFixed(1)}%`,
+      subtext: 'validation rate',
+      icon: <CheckCircle className="w-5 h-5" />,
+      iconColor: 'text-emerald-400'
+    }
+  ];
 
   return (
     <div className="pt-20 pb-12 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8">
+        <AnimatedSection animation="fade-down" className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Generation Dashboard</h1>
           <p className="text-gray-400">Monitor and control your synthetic data generation</p>
-        </div>
+        </AnimatedSection>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400">Generated</span>
-              <Database className="w-5 h-5 text-purple-400" />
-            </div>
-            <div className="text-3xl font-bold">{stats.generated.toLocaleString()}</div>
-            <div className="text-sm text-gray-400">of {generationConfig.targetCount.toLocaleString()} target</div>
-          </div>
-
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400">Speed</span>
-              <TrendingUp className="w-5 h-5 text-green-400" />
-            </div>
-            <div className="text-3xl font-bold">{stats.rate}</div>
-            <div className="text-sm text-gray-400">pairs / minute</div>
-          </div>
-
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400">Elapsed Time</span>
-              <Clock className="w-5 h-5 text-blue-400" />
-            </div>
-            <div className="text-3xl font-bold font-mono">{formatTime(stats.elapsed)}</div>
-            <div className="text-sm text-gray-400">running time</div>
-          </div>
-
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400">Quality Score</span>
-              <CheckCircle className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div className="text-3xl font-bold">{stats.quality.toFixed(1)}%</div>
-            <div className="text-sm text-gray-400">validation rate</div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {isLoading ? (
+            <>
+              <SkeletonStatsCard />
+              <SkeletonStatsCard />
+              <SkeletonStatsCard />
+              <SkeletonStatsCard />
+            </>
+          ) : (
+            statCards.map((stat, index) => (
+              <AnimatedSection key={index} animation="fade-up" delay={index * 50}>
+                <Card className="group hover:border-purple-500/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm text-gray-400">{stat.label}</span>
+                    <div className={`${stat.iconColor} group-hover:scale-110 transition-transform`}>
+                      {stat.icon}
+                    </div>
+                  </div>
+                  <div className={`text-3xl font-bold ${stat.mono ? 'font-mono' : ''}`}>
+                    {stat.value}
+                  </div>
+                  <div className="text-sm text-gray-500">{stat.subtext}</div>
+                </Card>
+              </AnimatedSection>
+            ))
+          )}
         </div>
 
         {/* Main Content */}
@@ -133,194 +246,201 @@ const Dashboard = () => {
           {/* Generation Control */}
           <div className="lg:col-span-2 space-y-6">
             {/* Progress */}
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Generation Progress</h2>
-                <span className={`px-3 py-1 rounded-full text-sm ${
-                  isGenerating 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-gray-500/20 text-gray-400'
-                }`}>
-                  {isGenerating ? 'Running' : 'Idle'}
-                </span>
-              </div>
-              
-              <div className="mb-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-400">Progress</span>
-                  <span className="text-white">{progress.toFixed(1)}%</span>
-                </div>
-                <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
-                    style={{ width: `${progress}%` }}
+            {isLoading ? (
+              <SkeletonProgress />
+            ) : (
+              <AnimatedSection animation="fade-up">
+                <Card>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-semibold">Generation Progress</h2>
+                    <Badge 
+                      variant={isGenerating ? 'success' : 'default'} 
+                      dot 
+                      pulsing={isGenerating}
+                    >
+                      {isGenerating ? 'Running' : stats.generated > 0 ? 'Paused' : 'Idle'}
+                    </Badge>
+                  </div>
+                  
+                  <Progress 
+                    value={stats.generated} 
+                    max={generationConfig.targetCount}
+                    size="lg"
+                    showLabel
+                    className="mb-6"
                   />
-                </div>
-              </div>
 
-              <div className="flex space-x-4">
-                {!isGenerating ? (
-                  <button
-                    onClick={handleStartGeneration}
-                    className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-medium hover:opacity-90 transition-opacity"
-                  >
-                    <Play className="w-5 h-5" />
-                    <span>Start Generation</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleStopGeneration}
-                    className="flex items-center space-x-2 px-6 py-3 bg-orange-500 rounded-lg font-medium hover:bg-orange-600 transition-colors"
-                  >
-                    <Pause className="w-5 h-5" />
-                    <span>Pause Generation</span>
-                  </button>
-                )}
-                
-                <button
-                  onClick={() => {
-                    setStats({ generated: 0, rate: 0, elapsed: 0, quality: 99.2 });
-                    setIsGenerating(false);
-                  }}
-                  className="flex items-center space-x-2 px-6 py-3 bg-slate-700 rounded-lg font-medium hover:bg-slate-600 transition-colors"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                  <span>Reset</span>
-                </button>
-                
-                <button
-                  disabled={stats.generated === 0}
-                  className="flex items-center space-x-2 px-6 py-3 bg-slate-700 rounded-lg font-medium hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download className="w-5 h-5" />
-                  <span>Export</span>
-                </button>
-              </div>
-            </div>
+                  <div className="flex flex-wrap gap-3">
+                    {!isGenerating ? (
+                      <Button
+                        onClick={handleStartGeneration}
+                        leftIcon={<Play className="w-5 h-5" />}
+                      >
+                        Start Generation
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleStopGeneration}
+                        variant="secondary"
+                        leftIcon={<Pause className="w-5 h-5" />}
+                        className="bg-orange-500/20 border-orange-500/30 hover:bg-orange-500/30"
+                      >
+                        Pause Generation
+                      </Button>
+                    )}
+                    
+                    <Button
+                      onClick={handleReset}
+                      variant="secondary"
+                      leftIcon={<RefreshCw className="w-5 h-5" />}
+                    >
+                      Reset
+                    </Button>
+                    
+                    <Button
+                      disabled={stats.generated === 0}
+                      variant="secondary"
+                      leftIcon={<Download className="w-5 h-5" />}
+                    >
+                      Export
+                    </Button>
+                  </div>
+                </Card>
+              </AnimatedSection>
+            )}
 
             {/* Recent Jobs */}
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-4">Recent Jobs</h2>
-              
-              {jobs.length === 0 ? (
-                <div className="text-center py-8 text-gray-400">
-                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No generation jobs yet</p>
-                  <p className="text-sm">Start your first generation to see jobs here</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {jobs.map((job) => (
-                    <div key={job.id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-2 h-2 rounded-full ${
-                          job.status === 'running' ? 'bg-green-400 animate-pulse' :
-                          job.status === 'completed' ? 'bg-blue-400' :
-                          job.status === 'paused' ? 'bg-orange-400' : 'bg-gray-400'
-                        }`} />
-                        <div>
-                          <div className="font-medium capitalize">{job.domain} Dataset</div>
-                          <div className="text-sm text-gray-400">{job.created}</div>
+            <AnimatedSection animation="fade-up" delay={100}>
+              <Card>
+                <h2 className="text-xl font-semibold mb-4">Recent Jobs</h2>
+                
+                {jobs.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-700/50 flex items-center justify-center">
+                      <FileText className="w-8 h-8 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-300 mb-2">No generation jobs yet</h3>
+                    <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+                      Start your first generation to see your job history here. 
+                      Jobs are saved so you can track progress and download results.
+                    </p>
+                    <Button
+                      onClick={handleStartGeneration}
+                      size="sm"
+                      leftIcon={<Play className="w-4 h-4" />}
+                    >
+                      Start First Generation
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {jobs.map((job) => (
+                      <div 
+                        key={job.id} 
+                        className="flex items-center justify-between p-4 bg-slate-700/30 rounded-xl hover:bg-slate-700/50 transition-colors"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className={`w-2.5 h-2.5 rounded-full ${
+                            job.status === 'running' ? 'bg-emerald-400 animate-pulse' :
+                            job.status === 'completed' ? 'bg-blue-400' :
+                            job.status === 'paused' ? 'bg-amber-400' : 'bg-gray-400'
+                          }`} />
+                          <div>
+                            <div className="font-medium capitalize">{job.domain} Dataset</div>
+                            <div className="text-sm text-gray-400">{job.created}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{job.target.toLocaleString()} items</div>
+                          <Badge 
+                            size="sm"
+                            variant={
+                              job.status === 'running' ? 'success' :
+                              job.status === 'completed' ? 'info' :
+                              job.status === 'paused' ? 'warning' : 'default'
+                            }
+                          >
+                            {job.status}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-medium">{job.target.toLocaleString()} items</div>
-                        <div className="text-sm text-gray-400 capitalize">{job.status}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </AnimatedSection>
           </div>
 
           {/* Configuration Panel */}
           <div className="space-y-6">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-              <div className="flex items-center space-x-2 mb-6">
-                <Settings className="w-5 h-5 text-purple-400" />
-                <h2 className="text-xl font-semibold">Configuration</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Domain</label>
-                  <select
+            <AnimatedSection animation="fade-left" delay={200}>
+              <Card>
+                <div className="flex items-center space-x-2 mb-6">
+                  <Settings className="w-5 h-5 text-purple-400" />
+                  <h2 className="text-xl font-semibold">Configuration</h2>
+                </div>
+                
+                <div className="space-y-4">
+                  <Select
+                    label="Domain"
                     value={generationConfig.domain}
                     onChange={(e) => setGenerationConfig({...generationConfig, domain: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="financial">Financial Education</option>
-                    <option value="healthcare">Healthcare</option>
-                    <option value="legal">Legal</option>
-                    <option value="technology">Technology</option>
-                    <option value="science">Science</option>
-                    <option value="custom">Custom Domain</option>
-                  </select>
-                </div>
+                    options={domainOptions}
+                  />
 
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Target Count</label>
-                  <input
+                  <Input
+                    label="Target Count"
                     type="number"
                     value={generationConfig.targetCount}
                     onChange={(e) => setGenerationConfig({...generationConfig, targetCount: parseInt(e.target.value) || 0})}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     min="100"
                     max="100000"
                     step="100"
                   />
-                </div>
 
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Batch Size</label>
-                  <input
+                  <Input
+                    label="Batch Size"
                     type="number"
                     value={generationConfig.batchSize}
                     onChange={(e) => setGenerationConfig({...generationConfig, batchSize: parseInt(e.target.value) || 0})}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     min="5"
                     max="50"
                     step="5"
                   />
-                </div>
 
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Output Format</label>
-                  <select
+                  <Select
+                    label="Output Format"
                     value={generationConfig.outputFormat}
                     onChange={(e) => setGenerationConfig({...generationConfig, outputFormat: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="jsonl">JSONL</option>
-                    <option value="csv">CSV</option>
-                    <option value="parquet">Parquet</option>
-                  </select>
+                    options={formatOptions}
+                  />
                 </div>
-              </div>
-            </div>
+              </Card>
+            </AnimatedSection>
 
             {/* Quick Tips */}
-            <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 border border-purple-500/20 rounded-xl p-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <Zap className="w-5 h-5 text-yellow-400" />
-                <h3 className="font-semibold">Quick Tips</h3>
-              </div>
-              <ul className="space-y-2 text-sm text-gray-300">
-                <li className="flex items-start space-x-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <span>Use batch size 25 for optimal speed on T4 GPU</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <span>Enable auto-save for long generation jobs</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                  <span>JSONL format is recommended for ML training</span>
-                </li>
-              </ul>
-            </div>
+            <AnimatedSection animation="fade-left" delay={300}>
+              <Card variant="gradient">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Zap className="w-5 h-5 text-yellow-400" />
+                  <h3 className="font-semibold">Quick Tips</h3>
+                </div>
+                <ul className="space-y-3 text-sm text-gray-300">
+                  <li className="flex items-start space-x-3">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>Use batch size 25 for optimal speed on T4 GPU</span>
+                  </li>
+                  <li className="flex items-start space-x-3">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>Enable auto-save for long generation jobs</span>
+                  </li>
+                  <li className="flex items-start space-x-3">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>JSONL format is recommended for ML training</span>
+                  </li>
+                </ul>
+              </Card>
+            </AnimatedSection>
           </div>
         </div>
       </div>

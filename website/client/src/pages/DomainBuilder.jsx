@@ -103,7 +103,7 @@ const DomainBuilder = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(domainConfig)
       });
-      const data = await response.json();
+      await response.json();
       setSavedMessage('Domain configuration saved successfully!');
       setTimeout(() => setSavedMessage(''), 3000);
     } catch (error) {

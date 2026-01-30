@@ -1,10 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Zap, Database } from 'lucide-react';
+import { Menu, X, Zap, Database, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
+/**
+ * Navbar Component
+ * 
+ * Fixed navigation with glass morphism effect, theme toggle,
+ * and smooth mobile menu transitions.
+ * 
+ * UX Improvements:
+ * - Backdrop blur for depth perception
+ * - Active link indicators with smooth transitions
+ * - Mobile-first responsive design
+ * - Theme toggle with smooth icon transition
+ */
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const { isDark, toggleTheme } = useTheme();
+
+  // Close mobile menu on route change
+  const pathname = location.pathname;
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
+
+  // Add shadow on scroll
+  const handleScroll = useCallback(() => {
+    setScrolled(window.scrollY > 10);
+  }, []);
+  
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
 
   const navLinks = [
     { path: '/', label: 'Home' },
@@ -17,13 +48,23 @@ const Navbar = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-700/50">
+    <nav 
+      className={`
+        fixed top-0 w-full z-50
+        bg-slate-900/80 backdrop-blur-xl
+        border-b transition-all duration-300
+        ${scrolled ? 'border-slate-700/50 shadow-lg shadow-black/10' : 'border-transparent'}
+      `}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <Database className="w-6 h-6 text-white" />
+          <Link 
+            to="/" 
+            className="flex items-center space-x-2 group"
+          >
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25 transition-transform group-hover:scale-105">
+              <Database className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               SynthGen
@@ -36,22 +77,52 @@ const Navbar = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                  isActive(link.path)
-                    ? 'bg-purple-500/20 text-purple-300'
-                    : 'text-gray-300 hover:text-white hover:bg-slate-700/50'
-                }`}
+                className={`
+                  relative px-4 py-2 rounded-lg
+                  font-medium text-sm
+                  transition-all duration-200
+                  ${isActive(link.path)
+                    ? 'text-white'
+                    : 'text-gray-400 hover:text-white'
+                  }
+                `}
               >
                 {link.label}
+                {/* Active indicator */}
+                {isActive(link.path) && (
+                  <span className="absolute inset-0 bg-purple-500/15 rounded-lg border border-purple-500/20" />
+                )}
               </Link>
             ))}
           </div>
 
-          {/* CTA Button */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Right side actions */}
+          <div className="hidden md:flex items-center space-x-3">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200"
+              aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            >
+              <div className="relative w-5 h-5">
+                <Sun className={`absolute inset-0 transition-all duration-300 ${isDark ? 'opacity-100 rotate-0' : 'opacity-0 rotate-90'}`} />
+                <Moon className={`absolute inset-0 transition-all duration-300 ${isDark ? 'opacity-0 -rotate-90' : 'opacity-100 rotate-0'}`} />
+              </div>
+            </button>
+            
+            {/* CTA Button */}
             <Link
               to="/dashboard"
-              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              className="
+                flex items-center space-x-2 px-5 py-2.5
+                bg-gradient-to-r from-purple-500 to-pink-500
+                rounded-xl font-medium text-sm text-white
+                shadow-lg shadow-purple-500/25
+                hover:shadow-xl hover:shadow-purple-500/30
+                hover:-translate-y-0.5
+                active:translate-y-0
+                transition-all duration-200
+              "
             >
               <Zap className="w-4 h-4" />
               <span>Start Generating</span>
@@ -59,44 +130,74 @@ const Navbar = () => {
           </div>
 
           {/* Mobile menu button */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-slate-700"
-          >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex md:hidden items-center space-x-2">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
+              aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
+              aria-label="Toggle menu"
+              aria-expanded={isOpen}
+            >
+              <div className="relative w-6 h-6">
+                <Menu className={`absolute inset-0 transition-all duration-200 ${isOpen ? 'opacity-0 rotate-90' : 'opacity-100 rotate-0'}`} />
+                <X className={`absolute inset-0 transition-all duration-200 ${isOpen ? 'opacity-100 rotate-0' : 'opacity-0 -rotate-90'}`} />
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Mobile Navigation */}
-      {isOpen && (
-        <div className="md:hidden bg-slate-800/95 backdrop-blur-md border-t border-slate-700/50">
-          <div className="px-4 py-4 space-y-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                onClick={() => setIsOpen(false)}
-                className={`block px-4 py-3 rounded-lg transition-all duration-200 ${
-                  isActive(link.path)
-                    ? 'bg-purple-500/20 text-purple-300'
-                    : 'text-gray-300 hover:text-white hover:bg-slate-700/50'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+      <div 
+        className={`
+          md:hidden overflow-hidden
+          transition-all duration-300 ease-out
+          ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
+        `}
+      >
+        <div className="px-4 py-4 space-y-1 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/50">
+          {navLinks.map((link, index) => (
             <Link
-              to="/dashboard"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center justify-center space-x-2 w-full px-4 py-3 mt-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-medium"
+              key={link.path}
+              to={link.path}
+              className={`
+                block px-4 py-3 rounded-xl
+                font-medium transition-all duration-200
+                ${isActive(link.path)
+                  ? 'bg-purple-500/15 text-white border border-purple-500/20'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }
+              `}
+              style={{ 
+                transitionDelay: isOpen ? `${index * 50}ms` : '0ms',
+                transform: isOpen ? 'translateX(0)' : 'translateX(-10px)',
+                opacity: isOpen ? 1 : 0
+              }}
             >
-              <Zap className="w-4 h-4" />
-              <span>Start Generating</span>
+              {link.label}
             </Link>
-          </div>
+          ))}
+          <Link
+            to="/dashboard"
+            className="
+              flex items-center justify-center space-x-2
+              w-full px-4 py-3 mt-3
+              bg-gradient-to-r from-purple-500 to-pink-500
+              rounded-xl font-medium
+              shadow-lg shadow-purple-500/25
+            "
+          >
+            <Zap className="w-4 h-4" />
+            <span>Start Generating</span>
+          </Link>
         </div>
-      )}
+      </div>
     </nav>
   );
 };
