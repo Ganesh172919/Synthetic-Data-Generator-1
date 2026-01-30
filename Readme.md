@@ -5,6 +5,8 @@
 ### _Enterprise-Grade AI Dataset Generation Platform_
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Node.js 16+](https://img.shields.io/badge/Node.js-16+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
+[![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Google Colab](https://img.shields.io/badge/Google%20Colab-Ready-F9AB00?style=for-the-badge&logo=google-colab)](https://colab.research.google.com/)
 [![GPU Optimized](https://img.shields.io/badge/GPU-Optimized-76B900?style=for-the-badge&logo=nvidia)](https://developer.nvidia.com/cuda-toolkit)
@@ -18,8 +20,9 @@ _From 30,000 Q&A pairs in 3 hours on a FREE Google Colab T4 GPU—to unlimited p
 <br/>
 
 [🚀 Quick Start](#-quick-start) •
-[📖 Documentation](#-documentation) •
-[🌐 Website (Coming Soon)](#-upcoming-website) •
+[📖 Documentation](#-full-documentation) •
+[🌐 Web Platform](#-full-stack-web-platform) •
+[🔌 API Reference](#-api-reference) •
 [🤝 Contributing](#-contributing)
 
 ---
@@ -28,70 +31,71 @@ _From 30,000 Q&A pairs in 3 hours on a FREE Google Colab T4 GPU—to unlimited p
 
 ## 🎯 Overview
 
-**Synthetic Data Generator** is a high-performance, production-ready Python platform designed to generate large-scale, domain-specific datasets for machine learning and AI training. Built with **extreme speed optimizations**, our system leverages cutting-edge LLM technology to produce high-quality, validated synthetic data.
+**Synthetic Data Generator** is a production-ready, full-stack platform for generating large-scale, domain-specific datasets for machine learning and AI training. Featuring a **beautiful React dashboard**, **RESTful API**, and **high-performance Python generators**, our system leverages cutting-edge LLM technology to produce high-quality, validated synthetic data.
 
-### ✨ What Makes Us Different
+### ✨ Key Features
 
 | Feature                       | Description                                                |
 | ----------------------------- | ---------------------------------------------------------- |
 | 💸 **Zero Cost**              | Runs entirely on Google Colab Free Tier (T4 GPU)           |
 | ⚡ **Blazing Fast**           | Up to **167 Q&A pairs/minute** with MEGA batch processing  |
+| 🌐 **Web Dashboard**          | Beautiful React UI with real-time progress tracking        |
+| 🔌 **RESTful API**            | Full API access for programmatic generation                |
 | 🧠 **Intelligent Generation** | 25 Q&A pairs per LLM call with smart prompting             |
 | 🛡️ **Bulletproof Safety**     | Emergency save handlers, auto-download on Colab disconnect |
 | ✅ **Quality Assured**        | Built-in pattern matching and content validation           |
 | 🔄 **Resume Support**         | Checkpoint-based resume for interrupted sessions           |
-| 🌍 **Universal Templates**    | Generate datasets for ANY domain, not just finance         |
-| 📂 **ML-Ready Output**        | Industry-standard JSONL format for training pipelines      |
+| 🌍 **Universal Templates**    | 6 pre-built templates + custom domain builder              |
+| 📂 **Multi-Format Output**    | Export to JSONL, CSV, or JSON formats                      |
 
 ---
 
-## 🌐 Full-Stack Web Application
+## 🌐 Full-Stack Web Platform
 
-> ✅ **NOW AVAILABLE** — Interactive web platform for synthetic data generation!
+> ✅ **FULLY AVAILABLE** — Production-ready web platform for synthetic data generation!
 
-We've built a complete full-stack application that makes synthetic data generation accessible through an intuitive web interface.
+We've built a complete full-stack application with an intuitive web interface for dataset generation.
 
-### 🎨 Platform Features
+### 🖥️ Platform Pages
 
-| Feature                   | Description                                     | Status     |
-| ------------------------- | ----------------------------------------------- | ---------- |
-| **Interactive Dashboard** | Real-time generation monitoring with live stats | ✅ Available |
-| **Custom Domain Builder** | Visual interface to define any dataset domain   | ✅ Available |
-| **Template Library**      | 6 pre-built templates for common use cases      | ✅ Available |
-| **Job Management**        | Start, monitor, pause, and download datasets   | ✅ Available |
-| **API Access**            | RESTful API for programmatic dataset generation | ✅ Available |
-| **Multiple Formats**      | Export to JSONL, JSON, or CSV                   | ✅ Available |
-| **Progress Tracking**     | Real-time progress with rate and ETA            | ✅ Available |
-| **Checkpoint Resume**     | Resume interrupted generation jobs              | ✅ Available |
+| Page                  | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| **🏠 Landing Page**   | Beautiful hero section with platform overview and features   |
+| **📊 Dashboard**      | Real-time generation monitoring with live stats and progress |
+| **📚 Templates**      | 6 pre-configured templates for common domains                |
+| **🔧 Domain Builder** | Visual interface to create custom dataset domains            |
+| **📖 Documentation**  | Complete API docs and usage guides                           |
+
+### 🎨 Features
+
+| Feature                      | Status       |
+| ---------------------------- | ------------ |
+| **Interactive Dashboard**    | ✅ Available |
+| **Real-time Progress**       | ✅ Available |
+| **Custom Domain Builder**    | ✅ Available |
+| **6 Pre-built Templates**    | ✅ Available |
+| **Job Management**           | ✅ Available |
+| **RESTful API**              | ✅ Available |
+| **Multiple Export Formats**  | ✅ Available |
+| **Rate Limiting & Security** | ✅ Available |
+| **Checkpoint Resume**        | ✅ Available |
+| **Dark Mode UI**             | ✅ Available |
 
 ### 🛠️ Tech Stack
 
 ```
-Frontend:     React + Vite + TailwindCSS
-Backend:      Node.js + Express
-Generator:    Python + Mistral-7B-Instruct
-Storage:      Local filesystem (cloud-ready)
-Integration:  Python subprocess with JSON events
+Frontend:     React 18 + Vite + TailwindCSS
+Backend:      Node.js + Express + CORS + Rate Limiting
+Generator:    Python + Mistral-7B-Instruct (4-bit quantized)
+Storage:      Local filesystem (cloud-ready architecture)
+Integration:  Python subprocess with JSON streaming events
 ```
 
-### 🚀 Quick Start - Full Stack
+### 📸 Screenshots
 
-See **[SETUP.md](SETUP.md)** for complete installation instructions.
-
-**TL;DR:**
-
-```bash
-# 1. Install Python dependencies
-cd Pre-Work && pip install transformers accelerate bitsandbytes torch tqdm
-
-# 2. Start backend server
-cd ../server && npm install && npm start
-
-# 3. Start frontend (new terminal)
-cd ../website/client && npm install && npm run dev
-```
-
-Then open http://localhost:5173 in your browser!
+|            Dashboard            |        Templates         |    Domain Builder     |
+| :-----------------------------: | :----------------------: | :-------------------: |
+| Real-time generation monitoring | Pre-configured templates | Create custom domains |
 
 ---
 
@@ -99,98 +103,119 @@ Then open http://localhost:5173 in your browser!
 
 ### Prerequisites
 
-- A Google Account (for Google Colab)
-- Basic familiarity with Python/Jupyter Notebooks
-- **Optional:** Local GPU (RTX 3090/4090 or better recommended)
+| Requirement          | Details                           |
+| -------------------- | --------------------------------- |
+| **Node.js**          | Version 16 or higher              |
+| **Python**           | Version 3.8 or higher             |
+| **npm**              | Comes with Node.js                |
+| **GPU** _(Optional)_ | NVIDIA T4, RTX 3090/4090, or A100 |
 
-### ⚡ Option 1: Google Colab (Recommended - Free!)
+### ⚡ 3-Step Setup
 
-```bash
-# 1. Upload the generator script to Colab
-# 2. Configure runtime: Runtime > Change runtime type > T4 GPU
-# 3. Run the generator:
-
-!python financial_education_generator_ultra.py
-```
-
-> ⏱️ **First run:** ~5 minutes to install dependencies and download model (~5GB)
-
-### 💻 Option 2: Local Machine with GPU
+**Step 1: Install Python Dependencies**
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/synthetic-data-generator.git
-cd synthetic-data-generator
-
-# Install dependencies
+cd Pre-Work
 pip install transformers accelerate bitsandbytes torch tqdm
-
-# Run the generator
-python Pre-Work/financial_education_generator_ultra.py
 ```
 
-### 🌍 Option 3: Universal Dataset Generator
-
-For generating datasets in **any domain** (not just finance):
+**Step 2: Start Backend Server**
 
 ```bash
-python Pre-Work/universal_dataset_generator.py
+cd server
+npm install
+npm start
 ```
+
+> Server runs on `http://localhost:3001`
+
+**Step 3: Start Frontend**
+
+```bash
+cd website/client
+npm install
+npm run dev
+```
+
+> Frontend runs on `http://localhost:5173`
+
+### 🎉 You're Ready!
+
+Open **http://localhost:5173** in your browser and start generating datasets!
 
 ---
 
 ## 📁 Project Structure
 
 ```
-Synthetic Data Generator/
+Synthetic-Data-Generator-1/
 │
-├── 📂 Pre-Work/                              # Core generation scripts
-│   ├── financial_education_generator_ultra.py   # 🚀 EXTREME SPEED (30k in 3hrs)
+├── 📂 Pre-Work/                              # Core Python generators
+│   ├── financial_education_generator_ultra.py   # 🚀 Extreme speed generator
 │   ├── universal_dataset_generator.py           # 🌍 Universal domain generator
 │   └── OPTIMIZATION_GUIDE.md                    # 📖 Performance tuning guide
 │
-├── 📂 server/                                # ✅ Backend API Server (NEW!)
+├── 📂 server/                                # ✅ Backend API Server
 │   ├── server.js                                # Express API with Python integration
 │   ├── generator_runner.py                      # Python subprocess wrapper
-│   ├── package.json                             # Node.js dependencies
 │   ├── test-integration.js                      # Integration tests
+│   ├── package.json                             # Node.js dependencies
 │   └── data/                                    # Generated datasets (gitignored)
+│       ├── outputs/                             # Final generated files
+│       ├── checkpoints/                         # Resume checkpoints
+│       └── configs/                             # Job configurations
 │
-├── 📂 website/                               # ✅ Web Application
-│   ├── client/                                  # React frontend
-│   │   ├── src/
-│   │   │   ├── pages/                           # Dashboard, Templates, Domain Builder
-│   │   │   ├── components/                      # Reusable UI components
-│   │   │   ├── services/                        # API client
-│   │   │   └── App.jsx                          # Main app component
-│   │   ├── package.json                         # Frontend dependencies
-│   │   └── vite.config.js                       # Vite configuration with proxy
-│   │
-│   └── server/                                  # Legacy (use /server instead)
+├── 📂 website/                               # ✅ React Web Application
+│   └── client/
+│       ├── src/
+│       │   ├── pages/
+│       │   │   ├── LandingPage.jsx              # Homepage with hero section
+│       │   │   ├── Dashboard.jsx                # Generation dashboard
+│       │   │   ├── Templates.jsx                # Template library
+│       │   │   ├── DomainBuilder.jsx            # Custom domain creation
+│       │   │   └── Documentation.jsx            # API documentation
+│       │   ├── components/
+│       │   │   ├── Navbar.jsx                   # Navigation bar
+│       │   │   ├── Footer.jsx                   # Footer component
+│       │   │   └── ui/                          # Reusable UI components
+│       │   ├── services/
+│       │   │   └── api.js                       # API client service
+│       │   └── App.jsx                          # Main app component
+│       ├── package.json                         # Frontend dependencies
+│       └── vite.config.js                       # Vite configuration
 │
 ├── 📄 SETUP.md                               # 📖 Complete setup guide
+├── 📄 QUICKSTART.md                          # ⚡ Quick start guide
+├── 📄 SECURITY.md                            # 🔒 Security documentation
 ├── 📄 Readme.md                              # You are here!
 └── 📄 LICENSE                                # MIT License
 ```
-
-### 📊 Component Comparison
-
-| Component          | Purpose                         | Status      |
-| ------------------ | ------------------------------- | ----------- |
-| **Python Generators** | Core dataset generation      | ✅ Production |
-| **Backend Server**    | API + Python integration     | ✅ Complete  |
-| **Frontend UI**       | Web interface                | ✅ Complete  |
-| **Integration**       | Full-stack communication     | ✅ Working   |
 
 ---
 
 ## 🔌 API Reference
 
-The backend server provides a RESTful API for programmatic dataset generation. See `server/README.md` for full documentation.
+The backend provides a comprehensive RESTful API for programmatic dataset generation.
+
+### Endpoints Overview
+
+| Method | Endpoint                          | Description              |
+| ------ | --------------------------------- | ------------------------ |
+| `GET`  | `/api/health`                     | Server health check      |
+| `GET`  | `/api/templates`                  | List available templates |
+| `GET`  | `/api/templates/:id`              | Get template by ID       |
+| `POST` | `/api/generate`                   | Start generation job     |
+| `GET`  | `/api/jobs`                       | List all jobs            |
+| `GET`  | `/api/jobs/:jobId`                | Get job status           |
+| `POST` | `/api/jobs/:jobId/stop`           | Stop a running job       |
+| `GET`  | `/api/downloads/:jobId/:filename` | Download dataset         |
+| `POST` | `/api/domains`                    | Save custom domain       |
+| `GET`  | `/api/domains`                    | List custom domains      |
 
 ### Quick API Examples
 
-**Start a generation job:**
+**Start a Generation Job:**
+
 ```bash
 curl -X POST http://localhost:3001/api/generate \
   -H "Content-Type: application/json" \
@@ -200,55 +225,67 @@ curl -X POST http://localhost:3001/api/generate \
     "batchSize": 25,
     "outputFormat": "jsonl",
     "domainDescription": "Python programming tutorials",
-    "topics": ["Functions", "Classes", "Async/Await"]
+    "topics": ["Functions", "Classes", "Async/Await", "Decorators"]
   }'
 ```
 
-**Check job status:**
-```bash
-curl http://localhost:3001/api/jobs/{jobId}
+**Response:**
+
+```json
+{
+  "jobId": "gen_a1b2c3d4",
+  "status": "initializing",
+  "message": "Generation job started"
+}
 ```
 
-**Download dataset:**
+**Check Job Status:**
+
 ```bash
-curl -O http://localhost:3001/api/downloads/{jobId}/dataset_{jobId}.jsonl
+curl http://localhost:3001/api/jobs/gen_a1b2c3d4
 ```
 
-### Available Endpoints
+**Response:**
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/health` | Server health check |
-| `GET` | `/api/templates` | List available templates |
-| `POST` | `/api/generate` | Start generation job |
-| `GET` | `/api/jobs/:jobId` | Get job status |
-| `GET` | `/api/jobs` | List all jobs |
-| `POST` | `/api/jobs/:jobId/stop` | Stop a running job |
-| `GET` | `/api/downloads/:jobId/:filename` | Download dataset |
-| `POST` | `/api/domains` | Save custom domain |
-| `GET` | `/api/domains` | List custom domains |
+```json
+{
+  "id": "gen_a1b2c3d4",
+  "status": "running",
+  "generated": 450,
+  "targetCount": 1000,
+  "progress": 45.0,
+  "rate": 12.5,
+  "estimatedTimeRemaining": 44
+}
+```
+
+**Download Completed Dataset:**
+
+```bash
+curl -O http://localhost:3001/api/downloads/gen_a1b2c3d4/dataset_gen_a1b2c3d4.jsonl
+```
 
 ---
 
 ## 🏗️ System Architecture
 
-Our full-stack platform integrates a modern web UI with high-performance Python generators:
-
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      WEB BROWSER (Client)                           │
-│                   React + Vite + TailwindCSS                        │
+│                   React 18 + Vite + TailwindCSS                     │
 │                    http://localhost:5173                            │
+│                                                                     │
+│  • Landing Page    • Dashboard      • Templates    • Domain Builder │
 └────────────────────────────┬────────────────────────────────────────┘
                              │ HTTP/REST API
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   EXPRESS API SERVER (Backend)                      │
-│                    Node.js + Express + CORS                         │
+│                 Node.js + Express + CORS + Rate Limiting            │
 │                    http://localhost:3001/api                        │
 │                                                                     │
-│  • Job Management     • Template Library    • Progress Tracking    │
-│  • File Storage       • Domain Builder      • Download Manager     │
+│  • Job Management     • Template Library    • Progress Tracking     │
+│  • File Storage       • Input Validation    • Download Manager      │
 └────────────────────────────┬────────────────────────────────────────┘
                              │ Python Subprocess (child_process.spawn)
                              ▼
@@ -256,12 +293,12 @@ Our full-stack platform integrates a modern web UI with high-performance Python 
 │                   GENERATOR RUNNER (Python Bridge)                  │
 │                      generator_runner.py                            │
 │                                                                     │
-│  • Parse JSON config  • Emit progress events  • Error handling     │
+│  • Parse JSON config  • Emit JSON events  • Error handling          │
 └────────────────────────────┬────────────────────────────────────────┘
                              │ Import & Execute
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│               UNIVERSAL DATASET GENERATOR (Core)                    │
+│               UNIVERSAL DATASET GENERATOR (Core Engine)             │
 │                  universal_dataset_generator.py                     │
 │                                                                     │
 │    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐        │
@@ -280,8 +317,7 @@ Our full-stack platform integrates a modern web UI with high-performance Python 
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    GENERATED DATASETS                               │
-│               server/data/outputs/*.jsonl                           │
-│                    (JSONL / CSV / JSON)                             │
+│               server/data/outputs/*.{jsonl,csv,json}                │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -299,7 +335,16 @@ Our full-stack platform integrates a modern web UI with high-performance Python 
 
 ## ⚙️ Configuration
 
-Customize the generator by editing the config class:
+### Generation Parameters
+
+| Parameter      | Range          | Default | Description                             |
+| -------------- | -------------- | ------- | --------------------------------------- |
+| `targetCount`  | 100-100,000    | 1000    | Number of items to generate             |
+| `batchSize`    | 5-50           | 25      | Items per LLM call (higher = faster)    |
+| `temperature`  | 0.0-2.0        | 0.8     | Model creativity (lower = more factual) |
+| `outputFormat` | jsonl/csv/json | jsonl   | Output file format                      |
+
+### Python Config Class
 
 ```python
 @dataclass
@@ -323,18 +368,18 @@ class ExtremeSpeedConfig:
 
 ## 📊 Performance Benchmarks
 
-| Hardware                 | Rate     | 10k Dataset | 30k Dataset |
-| ------------------------ | -------- | ----------- | ----------- |
-| **T4 GPU** (Colab Free)  | ~100/min | ~1.7 hours  | ~5 hours    |
-| **A100 GPU** (Colab Pro) | ~200/min | ~50 min     | ~2.5 hours  |
-| **RTX 3090/4090**        | ~150/min | ~1.1 hours  | ~3.5 hours  |
-| **CPU Only**             | ~10/min  | ~16 hours   | ~50 hours   |
+| Hardware                 | Rate     | 1k Dataset | 10k Dataset | 30k Dataset |
+| ------------------------ | -------- | ---------- | ----------- | ----------- |
+| **T4 GPU** (Colab Free)  | ~100/min | ~10 min    | ~1.7 hours  | ~5 hours    |
+| **A100 GPU** (Colab Pro) | ~200/min | ~5 min     | ~50 min     | ~2.5 hours  |
+| **RTX 3090/4090**        | ~150/min | ~7 min     | ~1.1 hours  | ~3.5 hours  |
+| **CPU Only**             | ~10/min  | ~1.7 hours | ~16 hours   | ~50 hours   |
 
 ---
 
-## 💾 Output Format
+## 💾 Output Formats
 
-Generated datasets are saved in ML-ready JSONL format:
+### JSONL (Recommended for ML Training)
 
 ```json
 {
@@ -345,48 +390,57 @@ Generated datasets are saved in ML-ready JSONL format:
   "answer": "The 50/30/20 rule is a simple budgeting framework that suggests allocating 50% of after-tax income to needs, 30% to wants, and 20% to savings and debt repayment...",
   "difficulty": "beginner",
   "question_type": "definition",
-  "created_at": "2026-01-28T10:30:00.000000"
+  "created_at": "2026-01-30T10:30:00.000000"
 }
 ```
 
-### 📚 Available Domains
+### CSV (For Spreadsheets & Analysis)
 
-<table>
-<tr>
-<td>
+```csv
+id,question,answer,topic,created_at
+fin_Per_Bud_1234,"What is the 50/30/20 rule?","The 50/30/20 rule is...",Personal Finance,2026-01-30T10:30:00
+```
 
-**💰 Financial Education**
+### JSON (For Web Apps & APIs)
 
-- Personal Finance
-- Credit & Debt
-- Investing
-- Banking
-- Real Estate
-- Tax Planning
-- Retirement
-- Insurance
-
-</td>
-<td>
-
-**🌍 Universal (Any Domain)**
-
-- Healthcare
-- Legal
-- Education
-- Technology
-- Science
-- History
-- Custom Topics
-- And more...
-
-</td>
-</tr>
-</table>
+```json
+[
+  {
+    "id": "fin_Per_Bud_1234",
+    "question": "What is the 50/30/20 rule?",
+    "answer": "The 50/30/20 rule is...",
+    "topic": "Personal Finance"
+  }
+]
+```
 
 ---
 
-## 🛡️ Data Safety Features
+## 📚 Pre-Built Templates
+
+| Template                    | Category   | Description                                                 |
+| --------------------------- | ---------- | ----------------------------------------------------------- |
+| 💰 **Financial Education**  | Finance    | Personal finance, investing, budgeting, credit management   |
+| 🏥 **Healthcare/Clinical**  | Healthcare | Medical terminology, patient education, clinical procedures |
+| ⚖️ **Legal Documents**      | Legal      | Contracts, compliance, legal terms, case law                |
+| 💻 **Programming Q&A**      | Technology | Code explanations, debugging, best practices, algorithms    |
+| 🔬 **Scientific Research**  | Science    | Research methodology, experiments, scientific concepts      |
+| 📚 **Educational Tutoring** | Education  | Math, science, english, history tutoring content            |
+
+---
+
+## 🛡️ Security Features
+
+### Built-in Protections
+
+| Feature               | Description                                                       |
+| --------------------- | ----------------------------------------------------------------- |
+| **Rate Limiting**     | API abuse prevention (100 req/15min general, 10/15min generation) |
+| **Input Validation**  | Comprehensive parameter validation                                |
+| **SIGINT/SIGTERM**    | Graceful shutdown with full data save                             |
+| **Colab Disconnect**  | Auto-download before session timeout                              |
+| **Checkpoint Resume** | Restart from exact last position                                  |
+| **Crash Recovery**    | Emergency buffer flush on any error                               |
 
 ### Emergency Save & Recovery
 
@@ -397,28 +451,6 @@ force_save_and_download()
 # Resume from checkpoint
 generator.resume_from_checkpoint("checkpoint.json")
 ```
-
-### Built-in Protections
-
-| Feature               | Protection                            |
-| --------------------- | ------------------------------------- |
-| **SIGINT/SIGTERM**    | Graceful shutdown with full data save |
-| **Colab Disconnect**  | Auto-download before session timeout  |
-| **Checkpoint Resume** | Restart from exact last position      |
-| **Crash Recovery**    | Emergency buffer flush on any error   |
-
----
-
-## 🛠️ Technology Stack
-
-| Layer             | Technology                                       |
-| ----------------- | ------------------------------------------------ |
-| **LLM**           | Mistral-7B-Instruct-v0.2 (4-bit quantized)       |
-| **Inference**     | Hugging Face Transformers + BitsAndBytes         |
-| **Optimization**  | FlashAttention 2, CUDA acceleration              |
-| **Validation**    | Pattern matching, length checks, quality filters |
-| **Deduplication** | MD5 hash-based (100x faster than embeddings)     |
-| **I/O**           | Async buffered writer with threading             |
 
 ---
 
@@ -442,6 +474,7 @@ clear_cache_interval: int = 15  # More frequent clearing
 2. Check quantization is enabled
 3. Ensure FlashAttention is installed
 4. Try reducing batch size for better throughput
+
 </details>
 
 <details>
@@ -450,6 +483,36 @@ clear_cache_interval: int = 15  # More frequent clearing
 - Keep browser tab active
 - Use `force_save_and_download()` periodically
 - Enable auto-save: `auto_save_interval: int = 180`
+
+</details>
+
+<details>
+<summary><b>🔵 Port Already in Use</b></summary>
+
+```bash
+# Find process using port 3001
+lsof -i :3001
+
+# Kill the process
+kill -9 <PID>
+
+# Or use different port
+PORT=3002 npm start
+```
+
+</details>
+
+<details>
+<summary><b>🟣 Python Not Found</b></summary>
+
+```bash
+# Set Python path environment variable
+export PYTHON_PATH=/usr/bin/python3
+
+# Or on Windows
+set PYTHON_PATH=C:\Python311\python.exe
+```
+
 </details>
 
 ---
@@ -458,37 +521,49 @@ clear_cache_interval: int = 15  # More frequent clearing
 
 ### ✅ Completed
 
-- [x] Extreme speed batch processing
-- [x] Emergency save handlers
-- [x] Colab auto-download
+- [x] Extreme speed batch processing (167 Q&A/min)
+- [x] Emergency save handlers & crash recovery
+- [x] Colab auto-download on disconnect
 - [x] Checkpoint-based resume
 - [x] Universal domain support
+- [x] Full-stack web application
+- [x] React dashboard with real-time progress
+- [x] RESTful API with rate limiting
+- [x] 6 pre-built domain templates
+- [x] Custom domain builder
+- [x] Multi-format export (JSONL, CSV, JSON)
+- [x] Job management system
+- [x] Comprehensive documentation
 
-### 🔜 In Progress
+### 🔜 Coming Soon
 
-- [ ] **Website Development** (see [Upcoming Website](#-upcoming-website))
-- [ ] Interactive web dashboard
-- [ ] Cloud-based generation
-- [ ] API access
-
-### 📋 Planned
-
+- [ ] Docker containerization
 - [ ] Multi-language dataset support
-- [ ] Custom domain templates
-- [ ] RAG-based factual grounding
-- [ ] Fine-tuning integration
-- [ ] Dataset marketplace
+- [ ] User authentication (JWT/OAuth)
+- [ ] Cloud storage integration (S3, GCS)
+- [ ] Fine-tuning integration pipeline
+- [ ] Dataset quality scoring
+
+### 📋 Future Plans
+
 - [ ] Team collaboration features
+- [ ] Dataset versioning
+- [ ] RAG-based factual grounding
+- [ ] Dataset marketplace
+- [ ] Real-time collaboration
+- [ ] Advanced analytics dashboard
 
 ---
 
-## 📖 Documentation
+## 📖 Full Documentation
 
-| Resource                                                           | Description                        |
-| ------------------------------------------------------------------ | ---------------------------------- |
-| [OPTIMIZATION_GUIDE.md](Pre-Work/OPTIMIZATION_GUIDE.md)            | Detailed performance tuning guide  |
-| [Universal Generator](Pre-Work/universal_dataset_generator.py)     | Generate datasets for any domain   |
-| [Ultra Generator](Pre-Work/financial_education_generator_ultra.py) | Maximum speed financial generation |
+| Resource                                                | Description                              |
+| ------------------------------------------------------- | ---------------------------------------- |
+| [QUICKSTART.md](QUICKSTART.md)                          | 3-minute quick start guide               |
+| [SETUP.md](SETUP.md)                                    | Complete installation & setup guide      |
+| [SECURITY.md](SECURITY.md)                              | Security considerations & best practices |
+| [OPTIMIZATION_GUIDE.md](Pre-Work/OPTIMIZATION_GUIDE.md) | Detailed performance tuning guide        |
+| [server/README.md](server/README.md)                    | Backend API documentation                |
 
 ---
 
@@ -496,7 +571,7 @@ clear_cache_interval: int = 15  # More frequent clearing
 
 We welcome contributions! Here's how you can help:
 
-### Code Contributions
+### Getting Started
 
 1. **Fork** the repository
 2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
@@ -504,15 +579,16 @@ We welcome contributions! Here's how you can help:
 4. **Push** to the branch (`git push origin feature/amazing-feature`)
 5. **Open** a Pull Request
 
-### Contribution Ideas
+### Contribution Areas
 
-| Area                 | Examples                                      |
-| -------------------- | --------------------------------------------- |
-| **🌐 Website**       | React components, UI/UX design, API endpoints |
-| **📝 Templates**     | New domain templates, question types          |
-| **⚡ Performance**   | Speed optimizations, memory efficiency        |
-| **📚 Documentation** | Tutorials, guides, examples                   |
-| **🐛 Bug Fixes**     | Issue resolution, error handling              |
+| Area                 | Examples                                         |
+| -------------------- | ------------------------------------------------ |
+| **🌐 Frontend**      | React components, UI/UX improvements, animations |
+| **🔧 Backend**       | API endpoints, performance optimizations         |
+| **🐍 Python**        | Generator improvements, new models               |
+| **📝 Templates**     | New domain templates, question types             |
+| **📚 Documentation** | Tutorials, guides, examples                      |
+| **🐛 Bug Fixes**     | Issue resolution, error handling                 |
 
 ---
 
