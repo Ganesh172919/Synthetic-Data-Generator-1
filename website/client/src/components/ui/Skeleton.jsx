@@ -7,6 +7,13 @@
  * UX Decision: Skeletons use a subtle shimmer animation to indicate
  * loading without being distracting. They match the size and shape
  * of the content they're replacing.
+ *
+ * Accessibility notes:
+ * - Skeletons are marked `aria-hidden="true"` because they are purely decorative.
+ * - Pair skeletons with meaningful text updates (e.g., "Loading templates...") when appropriate.
+ *
+ * Edge cases:
+ * - Avoid long-running skeleton states without progress or explanation; users may think the app is stuck.
  */
 
 /**

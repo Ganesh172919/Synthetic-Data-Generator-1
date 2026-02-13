@@ -1,3 +1,16 @@
+/**
+ * ESLint (Flat Config) for the React client.
+ *
+ * Educational notes:
+ * - This repo uses ESLint's "flat config" (`eslint.config.js`) rather than legacy `.eslintrc`.
+ * - We enable React Hooks rules and React Refresh rules for a better dev experience.
+ * - `globalIgnores(['dist'])` prevents linting build artifacts.
+ *
+ * How to run:
+ *   cd website/client
+ *   npm run lint
+ */
+
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'

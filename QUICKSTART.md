@@ -320,3 +320,92 @@ Start generating synthetic datasets for:
 - 💼 Demos and prototypes
 
 **Happy Dataset Generating!** 🚀
+
+## Educational Notes (Added)
+
+### What this file is for
+
+This quick start is meant to get you from “clone” to “running” as fast as possible. It covers:
+
+- starting the web UI and backend API
+- basic API usage with `curl`
+- common setup failures and quick fixes
+
+### Reality-aligned updates (paths, current behavior)
+
+Several commands in this document reference a top-level `server/` directory. In this repository layout, the backend is located at:
+
+- `website/server` (Express API server)
+- `website/client` (React + Vite frontend)
+
+There is **no** top-level `server/` directory.
+
+#### Correct folder commands (local dev)
+
+```bash
+# Backend
+cd website/server
+npm install
+npm start
+
+# Frontend (new terminal)
+cd website/client
+npm install
+npm run dev
+```
+
+### Real-world examples
+
+#### Example 1: Start a job (matches current demo API)
+
+```bash
+curl -X POST http://localhost:3001/api/generate ^
+  -H "Content-Type: application/json" ^
+  -d "{\"domain\":\"technology\",\"targetCount\":500,\"batchSize\":25,\"outputFormat\":\"jsonl\"}"
+```
+
+Notes:
+- On PowerShell, prefer single quotes for JSON and double quotes inside if needed.
+- On Windows `cmd.exe`, line continuation is `^` (shown above). In PowerShell, use backticks `` ` `` or put the command on one line.
+
+#### Example 2: Poll job status
+
+```bash
+curl http://localhost:3001/api/jobs/<jobId>
+```
+
+#### Example 3: Download output (demo payload)
+
+The demo server expects:
+
+```bash
+curl http://localhost:3001/api/downloads/<jobId>/jsonl
+curl http://localhost:3001/api/downloads/<jobId>/csv
+curl http://localhost:3001/api/downloads/<jobId>/json
+```
+
+### Edge cases & failure modes
+
+- **Download before completion**: the server returns an error if a job is not `completed`.
+- **In-memory jobs**: restarting the API server loses job history and custom domains.
+- **`parquet` is a placeholder**: the job config accepts `parquet`, but the demo download endpoint does not produce real parquet output yet.
+- **UI “demo mode”**: if the UI can’t reach the API, some pages fall back to simulated behavior.
+
+### Troubleshooting
+
+- API not responding: visit `http://localhost:3001/api/health`
+- UI not responding: visit `http://localhost:5173`
+- Wrong working directory: run `npm install` inside `website/server` and `website/client` (not the repo root).
+
+### Learning notes
+
+- The web platform is split into two independent Node projects:
+  - `website/server` (Express)
+  - `website/client` (Vite)
+- Vite’s dev server proxies `/api` calls to the Express server to avoid CORS problems in dev.
+
+### Next steps / exercises
+
+1. Read `docs/WEB_PLATFORM.md` and trace each endpoint in `website/server/index.js`.
+2. Run `Pre-Work/universal_dataset_generator.py` to generate a “real” dataset file outside the web UI.
+3. Compare the demo server’s mock output fields to the schema documented in `docs/DATASET_SCHEMA.md`.

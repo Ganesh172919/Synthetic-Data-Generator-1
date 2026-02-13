@@ -14,6 +14,11 @@ import { useTheme } from '../hooks/useTheme';
  * - Active link indicators with smooth transitions
  * - Mobile-first responsive design
  * - Theme toggle with smooth icon transition
+ *
+ * Accessibility notes:
+ * - Buttons include `aria-label` where the visual meaning is icon-only.
+ * - `aria-expanded` is used for the mobile menu toggle.
+ * - For production, consider adding focus trapping when the mobile menu is open.
  */
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);

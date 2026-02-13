@@ -5,7 +5,13 @@ import Button from '../components/ui/Button';
 /**
  * NotFound Component
  * 
- * 404 Page with helpful navigation options
+ * 404 Page with helpful navigation options.
+ *
+ * Educational notes:
+ * - This page is rendered for the catch-all route (`path="*"`) in `src/App.jsx`.
+ * - In SPAs, 404 handling is split between client routing and server routing.
+ *   For production hosting, ensure your server rewrites unknown routes to `index.html`
+ *   so React Router can handle them.
  */
 const NotFound = () => {
   return (

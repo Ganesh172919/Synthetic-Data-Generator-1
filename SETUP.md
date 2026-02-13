@@ -397,3 +397,87 @@ MIT License - See [LICENSE](LICENSE) for details.
 ---
 
 **Built with ❤️ for the AI/ML community**
+
+## Educational Notes (Added)
+
+### What this file is for
+
+`SETUP.md` is the “slow but reliable” setup document. It’s where we document the full environment assumptions (Node/Python/GPU) and how the pieces fit together.
+
+### Reality-aligned updates (paths, current behavior)
+
+As of **2026-02-13**, the repo layout on disk is:
+
+- Python generators: `Pre-Work/`
+- Web platform:
+  - Frontend: `website/client/`
+  - Backend: `website/server/`
+
+Important reality-aligned notes:
+
+1. There is **no** top-level `server/` directory in this repo. If you see `cd server` in older instructions, replace it with `cd website/server`.
+2. `website/` does **not** contain a `package.json`, so you cannot run a single `npm install` at `website/` to install both projects. Install dependencies separately in `website/server` and `website/client`.
+3. The Express backend in `website/server/index.js` is a **demo server** (jobs/domains stored in memory; generation is simulated).
+
+### Ports and proxy (how the browser reaches the API)
+
+- Express server default: `http://localhost:3001`
+- Vite dev server default: `http://localhost:5173`
+
+The frontend calls `/api/...` and Vite proxies that to `http://localhost:3001`. See:
+
+- `website/client/vite.config.js`
+
+This is why you typically don’t need to worry about CORS in development.
+
+### Step-by-step verification checklist
+
+Use this to confirm the platform is working end-to-end.
+
+1. **Backend health**
+   - Start: `cd website/server && npm start`
+   - Open: `http://localhost:3001/api/health`
+   - Expect: JSON with `status: "ok"`
+
+2. **Frontend loads**
+   - Start: `cd website/client && npm run dev`
+   - Open: `http://localhost:5173`
+   - Expect: Landing page loads with navigation
+
+3. **Templates load**
+   - Open Templates page in UI
+   - Expect: templates list from API (or fallback templates if API is down)
+
+4. **Job lifecycle**
+   - Start a generation job from Dashboard
+   - Expect: job appears in list, progresses, then completes (demo simulation)
+   - Download: export a mock dataset via `/api/downloads/:jobId/:format`
+
+### Real-world examples
+
+- Demo the platform in a workshop: run UI + server locally and show “job” lifecycle.
+- Generate a real dataset offline: run `Pre-Work/universal_dataset_generator.py` and inspect the JSONL output.
+
+### Edge cases & failure modes
+
+- **Restarting the server loses jobs** (in-memory `Map` storage).
+- **Running Python scripts may install large packages** (Torch/Transformers); prefer Colab for GPU ease.
+- **GPU OOM**: reduce batch sizes and token limits; see `Pre-Work/OPTIMIZATION_GUIDE.md`.
+
+### Troubleshooting
+
+- Port already in use:
+  - set `PORT=3002` for the backend or change Vite’s proxy target accordingly.
+- API unreachable from UI:
+  - confirm Vite proxy is active and the backend is on 3001.
+
+### Learning notes
+
+- “Demo backend” is a common pattern: it allows building UI/UX independently from expensive compute workflows.
+- When you later integrate Python generation, you’ll want a job queue and durable persistence. See `docs/WEB_PLATFORM.md`.
+
+### Next steps / exercises
+
+1. Read `docs/ARCHITECTURE.md` and sketch where you would add a worker process.
+2. Compare `SECURITY.md` recommendations with the demo server’s actual code (`website/server/index.js`).
+3. Write down a dataset spec (schema + constraints) using `docs/DATASET_SCHEMA.md` as a template.

@@ -8,6 +8,20 @@ import { forwardRef } from 'react';
  * 
  * UX Decision: Buttons use visual feedback with transforms and shadows
  * to provide instant feedback on hover/click, reducing perceived latency.
+ *
+ * Props (informal API):
+ * - `variant`: primary | secondary | ghost | danger | success | outline
+ * - `size`: xs | sm | md | lg | xl | icon | icon-sm | icon-lg
+ * - `isLoading`: shows spinner and disables the button
+ * - `disabled`: disables the button (also disabled when isLoading=true)
+ * - `leftIcon` / `rightIcon`: optional icon elements
+ *
+ * Usage example:
+ *   <Button variant="primary" isLoading={saving} leftIcon={<Save />}>Save</Button>
+ *
+ * Accessibility notes:
+ * - Provide an accessible name (button text or `aria-label` for icon-only buttons).
+ * - Loading states should still keep the purpose clear (we show "Loading..." for string children).
  */
 
 const Button = forwardRef(({

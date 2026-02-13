@@ -20,6 +20,11 @@ import Card from '../components/ui/Card';
  * - Clear visual hierarchy with typography
  * - Interactive hover states on cards
  * - Micro-interactions for delight
+ *
+ * Educational notes:
+ * - This page is mostly static content + UI components; it does not call the API.
+ * - CTAs route users to `/dashboard`, which is where job creation and downloads happen.
+ * - Animations are driven by `AnimatedSection` (IntersectionObserver-based) and respect reduced motion.
  */
 const LandingPage = () => {
   const features = [

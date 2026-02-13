@@ -2,6 +2,19 @@
   "name": "synthgen-server",
   "version": "1.0.0",
   "description": "Backend API server for Synthetic Data Generator",
+  "_educational_notes": {
+    "purpose": "Demo Express API used by the React UI in website/client (jobs are in-memory; progress is simulated).",
+    "how_to_run": [
+      "cd website/server",
+      "npm install",
+      "npm start"
+    ],
+    "lockfile_note": "package-lock.json is tool-managed. Prefer editing dependencies with npm and committing the resulting lockfile changes.",
+    "see_docs": [
+      "../../docs/WEB_PLATFORM.md",
+      "../../docs/REPO_TOUR.md"
+    ]
+  },
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

@@ -8,6 +8,11 @@ import { useEffect, useRef, useState } from 'react';
  * 
  * UX Decision: Animations are triggered only when elements become
  * visible, improving perceived performance and creating engagement.
+ *
+ * Educational notes:
+ * - `triggerOnce` avoids repeated animations when scrolling up/down.
+ * - `rootMargin` can be used to start animations slightly before elements are visible.
+ * - Always unobserve on cleanup to avoid leaking observers in long-lived SPAs.
  */
 
 export function useIntersectionObserver({

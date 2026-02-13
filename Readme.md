@@ -29,6 +29,135 @@ _From 30,000 Q&A pairs in 3 hours on a FREE Google Colab T4 GPU—to unlimited p
 
 </div>
 
+## Educational Notes (Added)
+
+### What this file is for
+
+This `Readme.md` is the **front door** to the repository. It gives a high-level overview, quick start steps, and a marketing-style feature list. The goal of the educational notes here is to:
+
+- make the setup instructions match the **actual folders on disk**
+- clearly separate the **real Python generators** from the **web demo backend**
+- give you a safe “learning path” through the repo and `docs/`
+
+### Reality-aligned updates (paths, current behavior)
+
+Some sections of the README describe a `server/` folder and “Python integration” behind the web API. In the current repo layout:
+
+- Backend API server is: `website/server/index.js`
+- Frontend is: `website/client/`
+- Python generators are: `Pre-Work/`
+- There is **no** top-level `server/` directory in this repository.
+
+#### Reality-aligned quick start (local)
+
+**1) Start the backend (Express demo API)**
+
+```bash
+cd website/server
+npm install
+npm start
+```
+
+API base: `http://localhost:3001/api`  
+Health check: `http://localhost:3001/api/health`
+
+**2) Start the frontend (React + Vite)**
+
+```bash
+cd website/client
+npm install
+npm run dev
+```
+
+UI: `http://localhost:5173`
+
+**3) Run a Python generator (separate from the web UI)**
+
+```bash
+cd Pre-Work
+python universal_dataset_generator.py --help
+```
+
+> Note: the Python scripts in `Pre-Work/` can generate datasets independently. The demo web backend does not currently spawn these scripts.
+
+#### Demo vs “production-like” generation
+
+**Current reality:** `website/server/index.js` simulates progress and produces a **mock dataset** at download time.
+
+**Where the “real” generation lives:** the Python scripts in `Pre-Work/` are where actual model-backed generation is implemented.
+
+If you want the web UI to drive real generation, the extension point is to replace the server’s simulated progress with a worker process that calls the Python generator (see `docs/ARCHITECTURE.md` and `docs/WEB_PLATFORM.md`).
+
+### Architecture (current state)
+
+```
+Browser (React UI)
+  │  GET/POST /api/*   (Vite dev proxy)
+  ▼
+Express API (website/server/index.js)
+  │  in-memory job Map + setInterval simulation
+  ▼
+Mock dataset payload (JSONL/CSV/JSON response)
+
+Real generation (today) lives separately:
+Pre-Work/*.py  → writes JSONL/JSON/CSV files
+```
+
+### Dataset schema overview (what to expect)
+
+Most examples use a Q&A dataset record with fields like:
+
+```json
+{
+  "id": "item_abc123_0001",
+  "topic": "Technology",
+  "question": "What is a React Hook?",
+  "answer": "A React Hook is a function that lets you...",
+  "difficulty": "beginner",
+  "created_at": "2026-01-29T00:00:00.000Z"
+}
+```
+
+For a deeper guide (including JSONL vs CSV tradeoffs), see `docs/DATASET_SCHEMA.md`.
+
+### Real-world examples
+
+1. **Support chat data for internal tooling**
+   - Generate “customer issue → agent response” pairs for training an intent classifier.
+2. **Template-driven Q&A**
+   - Start from “Technology” or “Financial” templates in the UI, then tweak topics and size.
+3. **Structured extraction datasets**
+   - Use the universal generator’s `json` mode to create records like:
+     - `{ "input": "...", "output": "...", "label": "..." }`
+
+### Edge cases & failure modes
+
+- **Hallucinations / unsafe advice**: synthetic content can look confident but be wrong (especially finance/medical/legal).
+- **PII leakage**: prompts can accidentally produce personal info; treat outputs as untrusted.
+- **Duplicates**: high-volume generation often repeats phrasing; dedup helps but isn’t semantic.
+- **GPU OOM**: large `max_new_tokens` and batch sizes can exceed VRAM; tune down for stability.
+- **Long installs**: the Python scripts may install large dependencies (Torch/Transformers).
+
+### Troubleshooting
+
+- UI can’t reach API: confirm `website/server` runs on port 3001 and Vite proxy is active (`website/client/vite.config.js`).
+- “Module not found”: run `npm install` in both `website/server` and `website/client`.
+- Python generation is slow: reduce batch size / token limits; verify GPU availability.
+
+### Learning notes
+
+- **Why JSONL is popular**: it streams well, supports large datasets, and plays nicely with data tooling.
+- **Why the web backend is “mock”**: it keeps the UI functional without requiring GPU/LLM runtime in the server.
+- **Why checkpointing matters**: long runs fail; resume support prevents losing progress.
+
+### Next steps / exercises
+
+Follow the learning path in `docs/README.md`, then:
+
+1. Trace the full web flow in DevTools Network (generate → jobs → download).
+2. Read the generator run loop in `Pre-Work/universal_dataset_generator.py`.
+3. Implement a “real job runner” behind the API (document-only in this repo; see `docs/WEB_PLATFORM.md`).
+
 ## 🎯 Overview
 
 **Synthetic Data Generator** is a production-ready, full-stack platform for generating large-scale, domain-specific datasets for machine learning and AI training. Featuring a **beautiful React dashboard**, **RESTful API**, and **high-performance Python generators**, our system leverages cutting-edge LLM technology to produce high-quality, validated synthetic data.

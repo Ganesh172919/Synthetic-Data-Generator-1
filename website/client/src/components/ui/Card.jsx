@@ -6,6 +6,21 @@
  * 
  * UX Decision: Cards use subtle hover states to indicate interactivity
  * and provide visual depth through shadows and border effects.
+ *
+ * Props (Card):
+ * - `variant`: default | glass | elevated | outlined | gradient | featured
+ * - `padding`: none | sm | md | lg | xl
+ * - `hover`: enable hover affordance even if not clickable
+ * - `onClick`: when provided, card becomes keyboard-focusable (tabIndex) and gets role="button"
+ *
+ * Usage example:
+ *   <Card variant="glass" hover>
+ *     <CardHeader>...</CardHeader>
+ *     <CardContent>...</CardContent>
+ *   </Card>
+ *
+ * Accessibility notes:
+ * - If you use `onClick`, consider also adding keyboard handlers (Enter/Space) for full button parity.
  */
 
 const Card = ({

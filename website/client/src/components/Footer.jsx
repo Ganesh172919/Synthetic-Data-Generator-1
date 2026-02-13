@@ -14,6 +14,11 @@ import { useTheme } from '../hooks/useTheme';
  * - Responsive layout
  * - Consistent spacing
  * - Theme-aware styling
+ *
+ * Educational notes:
+ * - External links use `rel="noopener noreferrer"` when opening a new tab for safety.
+ * - Some links in this demo are placeholders (`href="#"`). In production, replace them
+ *   with real routes or remove them to avoid confusing users.
  */
 const Footer = () => {
   const currentYear = new Date().getFullYear();

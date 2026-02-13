@@ -282,3 +282,21 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================================
+ * Educational Notes (Added)
+ * ============================================================================
+ *
+ * How to extend this design token system:
+ * 1) Add new CSS variables under :root (and update [data-theme="light"] if needed).
+ * 2) Prefer semantic tokens (e.g., --text-primary) over hard-coded colors in components.
+ * 3) Use `data-theme` switching instead of duplicating classes for dark/light.
+ *
+ * Contrast guidance:
+ * - For body text, aim for WCAG AA contrast against the chosen background.
+ * - Gradients look great but can reduce contrast; avoid gradients for small text.
+ *
+ * Mapping to the app:
+ * - Theme is toggled by `website/client/src/hooks/useTheme.jsx`, which sets `data-theme` on <html>.
+ * - Component styles reference these tokens via `var(--...)` (see `components.css`).
+ */

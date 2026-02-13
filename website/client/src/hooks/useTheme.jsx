@@ -8,6 +8,13 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
  * 
  * UX Decision: Respects user's system preference by default while
  * allowing manual override. Changes persist across sessions.
+ *
+ * Educational notes:
+ * - We set a `data-theme` attribute on `<html>` so CSS variables (design tokens) can react to theme.
+ * - `mounted` prevents a flash of incorrect theme during initial hydration.
+ * - `matchMedia('(prefers-color-scheme: ...)')` lets us respond to OS-level theme changes.
+ * - localStorage may be unavailable in some environments (privacy mode / blocked storage);
+ *   this implementation assumes a typical browser environment.
  */
 
 const ThemeContext = createContext(null);

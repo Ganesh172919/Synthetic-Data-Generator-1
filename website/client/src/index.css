@@ -6,6 +6,15 @@
 @import "./styles/animations.css";
 @import "./styles/components.css";
 
+/* Educational notes:
+ * - Tailwind v4 can be imported via `@import "tailwindcss";` (no separate base/components/utilities directives).
+ * - This file establishes the style layering:
+ *   1) Tailwind utilities
+ *   2) Design tokens (CSS variables)
+ *   3) Custom animations and component base styles
+ * - Theme switching is implemented by setting `data-theme` on <html> (see useTheme.jsx),
+ *   which changes token values in `design-tokens.css`.
+ */
 body {
   margin: 0;
   min-height: 100vh;

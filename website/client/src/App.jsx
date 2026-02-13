@@ -13,7 +13,11 @@ import NotFound from './pages/NotFound';
 /**
  * App Content Component
  * 
- * Separated to access theme context
+ * Separated to access theme context.
+ * 
+ * Educational notes:
+ * - `useTheme()` is a React Context hook, so this component must be rendered inside `ThemeProvider`.
+ * - The background gradient is applied at the app shell level so all pages inherit the theme styling.
  */
 function AppContent() {
   const { isDark } = useTheme();
@@ -37,6 +41,19 @@ function AppContent() {
       <div className="relative z-10">
         <Navbar />
         <main>
+          {/*
+            Route map (see also Navbar links):
+              /               → LandingPage
+              /dashboard      → Dashboard
+              /templates      → Templates
+              /domain-builder → DomainBuilder
+              /documentation  → Documentation
+              *               → NotFound
+
+            Educational note:
+            React Router v7 uses element-based routes. Keep routes here as the single source of truth
+            for navigation structure; pages should remain mostly self-contained.
+          */}
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
@@ -57,6 +74,11 @@ function AppContent() {
  * 
  * Root component with providers for theme, toast notifications,
  * and routing. Uses a gradient background with glass morphism effects.
+ * 
+ * Provider order (why it matters):
+ * - ThemeProvider: sets `data-theme` on <html> and provides `useTheme()` state
+ * - ToastProvider: allows any page/component to show toast feedback
+ * - Router: enables route-based navigation and page rendering
  */
 function App() {
   return (

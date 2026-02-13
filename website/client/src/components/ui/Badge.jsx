@@ -5,6 +5,19 @@
  * 
  * UX Decision: Badges use subtle background colors with matching
  * text colors to maintain readability while being visually distinct.
+ *
+ * Props (informal API):
+ * - `variant`: default | primary | success | warning | error | info
+ * - `size`: sm | md | lg
+ * - `dot`: show a small status dot
+ * - `pulsing`: animate the dot (use sparingly; consider prefers-reduced-motion)
+ *
+ * Usage example:
+ *   <Badge variant="success" dot>Completed</Badge>
+ *
+ * Accessibility notes:
+ * - Badges are visual labels. If the badge conveys critical status, also provide text (children)
+ *   rather than relying on color alone.
  */
 
 const Badge = ({

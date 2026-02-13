@@ -5,6 +5,22 @@ import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
  * Toast Notification System
  * 
  * A lightweight toast notification system for displaying feedback messages.
+ *
+ * Usage (typical):
+ * - Wrap app with <ToastProvider> (done in `src/App.jsx`)
+ * - Call `const { toast } = useToast()` inside components
+ * - Then `toast.success("Saved!")` / `toast.error("Failed")`, etc.
+ *
+ * API (informal):
+ * - `toast.show(options | messageString)`
+ * - `toast.success(message, options)`
+ * - `toast.error(message, options)`
+ * - `toast.warning(message, options)`
+ * - `toast.info(message, options)`
+ *
+ * Accessibility notes:
+ * - Toast items use `role="alert"` so screen readers announce them.
+ * - For critical flows, don't rely only on toasts; also show inline errors near inputs.
  */
 
 const ToastContext = createContext(null);

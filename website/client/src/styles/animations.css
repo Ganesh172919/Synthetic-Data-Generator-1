@@ -426,3 +426,18 @@
  * REDUCED MOTION OVERRIDES
  * Already handled in design-tokens.css
  * ======================================== */
+
+/* ============================================================================
+ * Educational Notes (Added)
+ * ============================================================================
+ *
+ * Performance-friendly animation rules of thumb:
+ * - Prefer animating `transform` and `opacity` (GPU-friendly) over layout properties.
+ * - Keep durations short for micro-interactions (150–300ms) and longer for page reveals (300–700ms).
+ * - Always respect `prefers-reduced-motion` (this repo applies global overrides in `design-tokens.css`).
+ *
+ * Adding a new animation:
+ * 1) Define a @keyframes block near the top.
+ * 2) Add a utility class (e.g., `.animate-your-effect`) that uses that keyframe.
+ * 3) If used for scroll reveals, consider adding a corresponding variant in `useIntersectionObserver.jsx`.
+ */

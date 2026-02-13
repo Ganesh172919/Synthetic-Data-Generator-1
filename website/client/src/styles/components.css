@@ -621,3 +621,21 @@ h6 { font-size: var(--text-base); }
   width: 48px;
   height: 48px;
 }
+
+/* ============================================================================
+ * Educational Notes (Added)
+ * ============================================================================
+ *
+ * Style layering in this client:
+ * - `index.css` imports Tailwind, then tokens, then these component styles.
+ * - Components typically use Tailwind utility classes directly, but these base styles
+ *   are useful for shared patterns and global typography defaults.
+ *
+ * When to add rules here vs in JSX:
+ * - Add rules here when many components share the same styling (e.g., `.glass-card`).
+ * - Keep one-off styles in JSX using utilities to avoid a growing global stylesheet.
+ *
+ * Debugging tip:
+ * - If you see unexpected colors, check whether `data-theme="light"` is set on <html>
+ *   (controlled by `useTheme.jsx`) and which CSS variables are active.
+ */

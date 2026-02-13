@@ -8,6 +8,29 @@ import { forwardRef } from 'react';
  * 
  * UX Decision: Uses subtle focus states with ring effects
  * for clear visual feedback without being distracting.
+ *
+ * Props (Input):
+ * - `label`: optional label text shown above the input
+ * - `error` / `success` / `helperText`: validation and helper messaging
+ * - `leftIcon` / `rightIcon`: optional icon elements
+ * - `size`: sm | md | lg
+ *
+ * Usage example:
+ *   <Input
+ *     label="Target count"
+ *     type="number"
+ *     value={targetCount}
+ *     onChange={(e) => setTargetCount(e.target.value)}
+ *     helperText="100–100,000 items"
+ *   />
+ *
+ * Controlled vs uncontrolled:
+ * - Controlled: pass `value` + `onChange` from React state (recommended for forms).
+ * - Uncontrolled: pass `defaultValue` and read via refs on submit.
+ *
+ * Accessibility notes:
+ * - For full label association, inputs should have an `id` and labels should use `htmlFor`.
+ *   This demo component renders a visual label but does not enforce id/htmlFor wiring.
  */
 
 const Input = forwardRef(({
@@ -98,6 +121,9 @@ Input.displayName = 'Input';
  * Textarea Component
  * 
  * A textarea variant of the Input component
+ *
+ * Educational note:
+ * - Textareas are typically used for longer descriptions (e.g., domain description or prompt context).
  */
 export const Textarea = forwardRef(({
   label,
@@ -164,6 +190,10 @@ Textarea.displayName = 'Textarea';
  * Select Component
  * 
  * A styled select dropdown
+ *
+ * Educational notes:
+ * - `options` is an array of { value, label } objects for predictable rendering.
+ * - The placeholder option is disabled so users must choose a real value.
  */
 export const Select = forwardRef(({
   label,

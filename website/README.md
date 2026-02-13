@@ -174,3 +174,74 @@ The frontend is configured to proxy API requests to the backend during developme
 ## 📄 License
 
 MIT License - see the [LICENSE](../LICENSE) file for details.
+
+## Educational Notes (Added)
+
+### What this file is for
+
+This README documents the **web platform** portion of the repository:
+
+- `website/client` — React + Vite frontend
+- `website/server` — Express backend API (demo implementation)
+
+### Reality-aligned updates (paths, current behavior)
+
+There is no `website/package.json` in this repo. That means:
+
+- You cannot run `npm install` or `npm run dev` from `website/` as a single workspace command.
+- Install and run **separately** in `website/server` and `website/client`.
+
+The backend is a **demo**:
+- jobs/domains are stored in memory (lost on restart)
+- progress is simulated
+- dataset downloads return mock payloads (useful for UI testing)
+
+### API contract (as implemented)
+
+The “job” object returned by the server typically contains:
+
+- `id`
+- `domain`
+- `targetCount`, `batchSize`, `outputFormat`
+- `status`: `running` | `stopped` | `completed`
+- `generated`
+- `createdAt`, `updatedAt`
+
+Error responses are usually:
+
+```json
+{ "error": "Human readable message" }
+```
+
+### ASCII sequence diagram (UI → API)
+
+```
+User clicks "Start Generation"
+  │
+  ├─► POST /api/generate  (create job)
+  │       │
+  │       └─► jobId returned
+  │
+  ├─► GET /api/jobs/:jobId (poll)
+  │       │
+  │       └─► status running → completed
+  │
+  └─► GET /api/downloads/:jobId/:format (download mock dataset)
+```
+
+### Extension points (how to make it “real”)
+
+If you want the backend to generate real datasets:
+
+1. Replace the `simulateProgress(...)` loop with a real job runner (queue + worker).
+2. Call a Python generator from `Pre-Work/` and write outputs to disk.
+3. Update `/api/downloads/...` to stream the generated file instead of synthesizing payloads in memory.
+
+For more detailed guidance, see:
+- `docs/ARCHITECTURE.md`
+- `docs/WEB_PLATFORM.md`
+
+### Next steps / exercises
+
+1. Open `website/server/index.js` and annotate each endpoint with request/response examples.
+2. Add persistence (SQLite) and document what changes in the job lifecycle.

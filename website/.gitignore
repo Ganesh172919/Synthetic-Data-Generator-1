@@ -31,3 +31,9 @@ coverage/
 # Temporary files
 tmp/
 temp/
+
+# Educational notes:
+# - `node_modules/` is always environment-specific; never commit it.
+# - `dist/` and `build/` are compiled outputs; CI or release pipelines should produce them.
+# - `.env*` files often contain secrets (API keys). Commit an `.env.example` instead if needed.
+# - `.vite/` contains dev server cache artifacts; safe to delete to “reset” weird build issues.

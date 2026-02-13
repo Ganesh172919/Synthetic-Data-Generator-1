@@ -14,6 +14,25 @@ Features:
 ✅ Configurable dataset size and quality settings
 ✅ Support for local models (HuggingFace) and APIs (OpenAI, etc.)
 
+Reality-aligned notes (important for learners):
+
+- This file is a *standalone generator* that writes datasets to disk (JSONL/JSON/CSV).
+  It is not automatically wired into the web demo backend in `website/server/`.
+- The goal is to make end-to-end generation robust for long runs:
+  buffering + checkpoints + emergency-save handlers exist because large jobs fail.
+
+Model providers (choose in `GeneratorConfig.provider`):
+
+- HUGGINGFACE: Runs a local model via Transformers (GPU recommended).
+- OPENAI: Uses OpenAI API via `OPENAI_API_KEY` environment variable.
+- MOCK: Generates deterministic dummy output to test the pipeline without a model.
+
+Parse modes (choose in `run(..., parse_mode=...)`):
+
+- qa: Question/answer pairs (expects "Q1:" / "A1:" style output).
+- text: Free-form samples separated by a marker (default: "---SAMPLE---").
+- json: Structured JSON objects separated by a marker (default: "---ENTRY---").
+
 Usage:
     python universal_dataset_generator.py
     
@@ -31,7 +50,16 @@ import subprocess
 import sys
 
 def install_dependencies():
-    """Install required packages quietly."""
+    """
+    Install required packages quietly.
+
+    Educational note:
+    - This “auto-install on import” pattern is convenient for Colab notebooks and quick demos.
+    - In production or controlled environments, you usually want a pinned `requirements.txt`
+      and explicit installs (auto-install can be slow and surprising).
+    - Errors are swallowed on purpose here so the script can still run in "MOCK" mode even
+      if heavyweight dependencies fail to install.
+    """
     packages = [
         "transformers>=4.36.0",
         "accelerate>=0.25.0",
@@ -52,7 +80,7 @@ def install_dependencies():
             pass
     print("✅ Dependencies ready!\n")
 
-# Auto-install on import
+# Auto-install on import (see docstring above for tradeoffs).
 install_dependencies()
 
 import os
@@ -226,7 +254,18 @@ class ThreadSafeSet:
 # ============================================================================
 
 class AsyncFileWriter:
-    """High-performance async file writer with buffering."""
+    """
+    High-performance async file writer with buffering.
+
+    Why this exists (educational note):
+    - Writing every record synchronously can dominate runtime for large datasets.
+    - Buffering + background flushing keeps the generator compute-bound.
+
+    Format behavior:
+    - JSONL: stream-friendly; we append each flushed batch as lines (safe for large datasets).
+    - JSON/CSV: we accumulate all items in memory (`_all_items`) and write once at the end.
+      This is convenient but can be memory-heavy for huge targets.
+    """
     
     def __init__(self, filepath: str, output_format: str = "jsonl", buffer_size: int = 50):
         self.filepath = filepath
@@ -333,7 +372,17 @@ class AsyncFileWriter:
 # ============================================================================
 
 class BaseModelBackend(ABC):
-    """Abstract base class for model backends."""
+    """
+    Abstract base class for model backends.
+
+    Educational note:
+    Backends are responsible for:
+    - loading any required model/client resources (`load`)
+    - generating a raw text response for a given prompt (`generate`)
+    - optionally clearing caches between batches (`clear_cache`)
+
+    The rest of the pipeline (parsing, validation, dedup, writing) is provider-agnostic.
+    """
     
     @abstractmethod
     def generate(self, prompt: str) -> str:
@@ -413,6 +462,8 @@ class HuggingFaceBackend(BaseModelBackend):
     def generate(self, prompt: str) -> str:
         with self._lock:
             try:
+                # Many instruct-tuned models (including Mistral Instruct) use an [INST] wrapper.
+                # If you swap models, you may need to adjust this formatting to match the model's chat template.
                 formatted = f"[INST] {prompt} [/INST]"
                 
                 inputs = self.tokenizer(
@@ -468,6 +519,10 @@ class OpenAIBackend(BaseModelBackend):
     
     def generate(self, prompt: str) -> str:
         try:
+            # Educational note:
+            # OpenAI token limits are model-dependent. If you see API errors about context length
+            # or max tokens, reduce `GeneratorConfig.max_new_tokens` and/or shorten prompts,
+            # or switch to a model with a larger context window.
             response = self.client.chat.completions.create(
                 model=self.config.openai_model,
                 messages=[{"role": "user", "content": prompt}],
@@ -500,7 +555,13 @@ class MockBackend(BaseModelBackend):
 
 
 def get_backend(config: GeneratorConfig) -> BaseModelBackend:
-    """Factory function to get appropriate backend."""
+    """
+    Factory function to get appropriate backend.
+
+    Educational note:
+    A factory keeps provider selection in one place, which makes it easier to add new
+    providers later (e.g., Anthropic, Azure OpenAI, local llama.cpp, etc.).
+    """
     if config.provider == ModelProvider.HUGGINGFACE:
         return HuggingFaceBackend(config)
     elif config.provider == ModelProvider.OPENAI:
@@ -538,6 +599,9 @@ Q2: [question here]
 A2: [detailed answer here]
 
 ...continue up to Q{count}"""
+        # Educational note:
+        # Strict formatting instructions improve parseability, but models can still drift.
+        # If parsing fails often, reduce temperature and tighten the format contract further.
         return prompt
     
     @staticmethod
@@ -584,7 +648,18 @@ class ResponseParser:
     
     @staticmethod
     def parse_qa_response(response: str, min_length: int = 50) -> List[Dict]:
-        """Parse Q&A formatted response."""
+        """
+        Parse Q&A formatted response.
+
+        Expected model output is a repeated pattern like:
+        - Q1: ...
+        - A1: ...
+
+        Edge cases to be aware of:
+        - Models sometimes emit "Question 1:" instead of "Q1:" (this parser is tolerant-ish).
+        - Answers can span multiple lines; we treat subsequent non-Q/non-A lines as continuation.
+        - This is a lightweight parser: it aims for speed, not perfect robustness.
+        """
         qa_pairs = []
         current_q = None
         current_a_lines = []
@@ -634,13 +709,30 @@ class ResponseParser:
     
     @staticmethod
     def parse_text_response(response: str, separator: str = "---SAMPLE---") -> List[Dict]:
-        """Parse text samples separated by marker."""
+        """
+        Parse text samples separated by marker.
+
+        Educational note:
+        Separators are a cheap but effective way to split model output into records.
+        If the model forgets separators, lower temperature and add more explicit examples.
+        """
         samples = response.split(separator)
         return [{"text": s.strip()} for s in samples if s.strip()]
     
     @staticmethod
     def parse_json_response(response: str, separator: str = "---ENTRY---") -> List[Dict]:
-        """Parse JSON entries separated by marker."""
+        """
+        Parse JSON entries separated by marker.
+
+        Implementation notes:
+        - We search for the first '{' and last '}' in each entry chunk and attempt `json.loads`.
+        - This tolerates extra prose around the JSON but can fail on trailing commas or invalid JSON.
+
+        If you need high reliability, consider:
+        - prompting the model to emit strict JSON only
+        - adding a JSON repair step
+        - using a streaming JSON parser or a schema validator (pydantic/jsonschema)
+        """
         entries = []
         parts = response.split(separator)
         
@@ -740,7 +832,14 @@ class UniversalGenerator:
         return f"{self.config.output_file}{ext}"
     
     def _hash_content(self, content: Dict) -> str:
-        """Generate hash for content deduplication."""
+        """
+        Generate hash for content deduplication.
+
+        Educational note:
+        - Hash dedup is fast and prevents exact duplicates.
+        - It does not catch paraphrases / semantic duplicates.
+        - We hash sorted JSON to avoid key-order differences changing the hash.
+        """
         text = json.dumps(content, sort_keys=True)
         return hashlib.md5(text.encode()).hexdigest()[:16]
     
@@ -964,6 +1063,15 @@ class UniversalGenerator:
         print("🚀 Starting generation...\n")
         
         try:
+            # Run-loop diagram (conceptual):
+            #
+            #   while generated < target:
+            #     1) build prompt for parse_mode
+            #     2) backend.generate(prompt) -> raw text
+            #     3) parse raw text -> candidate records
+            #     4) validate length/format + dedup via hash set
+            #     5) enqueue writes (async writer)
+            #     6) periodically checkpoint + clear cache
             while self.generated.get() < self.config.target_size:
                 # Generate batch
                 items = self._generate_batch()

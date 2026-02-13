@@ -259,3 +259,58 @@ For security concerns or vulnerability reports:
 ---
 
 **Note**: This is a development/MVP implementation. For production deployment, implement the recommendations in the "Remaining Considerations" section above.
+
+## Educational Notes (Added)
+
+### What this file is for
+
+`SECURITY.md` documents security measures, checks, and recommendations. It serves two audiences:
+
+1. **Developers** who want to harden the platform for production
+2. **Reviewers** who want to understand the current risk surface and gaps
+
+### Reality-aligned updates (paths, current behavior)
+
+The most important “source of truth” for what is implemented today is:
+
+- `website/server/index.js` — Express demo API
+
+Reality check (implemented vs documented):
+
+| Topic | What this document says | What exists in `website/server/index.js` today |
+| --- | --- | --- |
+| Input validation | Extensive validation | Basic validation for a few fields (domain/count/batch/format) |
+| Rate limiting | Mentioned as implemented/fixed | Not implemented in the demo server code |
+| Path traversal prevention | Detailed prevention notes | Download endpoint serves generated mock payload; no filesystem path handling |
+| AuthN/AuthZ | Recommended | Not implemented |
+| Persistence | Discussed | Jobs/domains stored in memory (lost on restart) |
+
+If you want to align implementation with the stronger posture described above, treat this file as a roadmap rather than a guarantee.
+
+### Synthetic data safety (content risks)
+
+Security isn’t only about servers and endpoints. With synthetic data generation, “security” also includes **output safety**:
+
+- **PII leakage**: prompts can produce personal data even when you didn’t intend it.
+- **Harmful advice**: finance/medical/legal content can be wrong but appear confident.
+- **Bias and stereotypes**: synthetic text can amplify bias depending on prompts and sampling.
+- **Data provenance**: without metadata, you can’t audit how a dataset was produced.
+
+Practical mitigations:
+
+1. Add output filters (PII patterns, unsafe advice phrases).
+2. Keep `metadata` fields (prompt, provider/model, parameters, timestamp).
+3. Sample and review outputs manually before training or sharing.
+
+See `docs/SECURITY_AND_SAFETY.md` for an extended threat model and safety checklist.
+
+### Edge cases & failure modes
+
+- “Secure in docs, insecure in code”: happens when security docs outpace MVP implementation.
+- “Local demo becomes internet-exposed”: binding a dev server to `0.0.0.0` changes the threat model.
+- “Large payloads”: datasets can be huge; add input size limits and streaming downloads for production.
+
+### Next steps / exercises
+
+1. Read `website/server/index.js` and list every endpoint + the validations it actually performs.
+2. Add a small “security acceptance checklist” you can run before deploying (auth, rate limit, persistence, logs).

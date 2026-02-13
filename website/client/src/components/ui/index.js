@@ -2,6 +2,11 @@
  * UI Components Index
  * 
  * Central export for all reusable UI components.
+ *
+ * Educational note:
+ * - This "barrel file" makes imports shorter (`import { Button } from .../ui`) at the cost of
+ *   potentially hiding individual file boundaries.
+ * - For small apps this is fine; for larger apps consider whether barrel exports affect tree-shaking.
  */
 
 // Core Components

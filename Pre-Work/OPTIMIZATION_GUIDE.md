@@ -268,3 +268,81 @@ python financial_education_generator_optimized.py
   "created_at": "2026-01-15T10:30:00.000000"
 }
 ```
+
+## Educational Notes (Added)
+
+### What this file is for
+
+This guide explains *why* the “ultra/optimized” generator variants can be dramatically faster than naive LLM prompting loops. It’s a performance playbook you can reuse for other domains.
+
+### Reality-aligned updates (paths, current behavior)
+
+The optimization concepts here apply to both:
+
+- `Pre-Work/financial_education_generator_ultra.py` (finance-specific, very aggressive)
+- `Pre-Work/universal_dataset_generator.py` (domain-agnostic, more general)
+
+The web backend (`website/server/index.js`) does not run these generators today; it simulates job progress.
+
+### Why these optimizations work (intuition + mechanics)
+
+1. **Batching amortizes fixed costs**
+   - Each model call has overhead (tokenization, scheduling, Python glue, I/O).
+   - Generating N items per call spreads that overhead across more outputs.
+
+2. **Async/buffered I/O reduces stalls**
+   - Writing every item synchronously creates many small writes.
+   - Buffering lets the generator stay compute-bound instead of I/O-bound.
+
+3. **Simple dedup beats semantic dedup (for speed)**
+   - Hash-based deduplication is extremely fast.
+   - It does not catch paraphrase-level duplicates, but it prevents exact/repeated outputs cheaply.
+
+4. **Quantization increases throughput**
+   - 4-bit quantization reduces VRAM and can increase effective throughput on limited hardware.
+
+### When NOT to use these settings
+
+The fastest settings are not always the best:
+
+- If your model frequently drifts from the output format, mega-batches can produce many unusable items at once.
+- If quality matters more than speed, you may prefer smaller batches and more conservative sampling.
+- Hash dedup can still allow “semantic duplicates” that hurt dataset diversity.
+
+### Benchmarking guidance (practical)
+
+Track these metrics for each run:
+
+- **items/min** (or Q&A/min) — primary throughput metric
+- **acceptance rate** — accepted items / total generated items
+- **dup rate** — duplicates skipped / total attempts
+- **VRAM headroom** — peak VRAM usage and “OOM margin”
+
+Recommendation: record parameters (batch size, max tokens, temperature) alongside results so the benchmark is reproducible.
+
+### Hardware-tier tuning recipes
+
+These are starting points. Adjust based on failure modes.
+
+#### T4 (Colab Free)
+- Keep batches moderate
+- Keep token limits conservative
+- Expect slower warm-up (model download + install)
+
+#### RTX 3090/4090
+- Increase batch size gradually until you see OOM or format drift
+- Use quantization if VRAM is tight; otherwise compare full precision vs quantized
+
+#### CPU-only
+- Reduce expectations; focus on correctness and small dataset sizes
+- Consider using the `MOCK` provider for pipeline testing
+
+### Learning notes
+
+- High throughput generation is usually about **reducing per-item overhead**, not “making the model smarter”.
+- Many performance tricks become reliability tricks: buffering + checkpoints exist because long runs fail.
+
+### Next steps / exercises
+
+1. Choose one knob (batch size, max tokens, temperature) and run a small sweep; chart throughput vs quality.
+2. Design a lightweight validator for your domain (red flags, forbidden phrases) and measure how it affects acceptance rate.

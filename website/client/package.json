@@ -2,7 +2,30 @@
   "name": "client",
   "private": true,
   "version": "0.0.0",
+  "description": "React + Vite frontend for the SynthGen (Synthetic Data Generator) web platform.",
   "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "synthetic-data",
+    "dataset-generation",
+    "react",
+    "vite",
+    "ui",
+    "dashboard"
+  ],
+  "_educational_notes": {
+    "purpose": "Frontend UI for creating and monitoring dataset generation jobs.",
+    "how_to_run": [
+      "cd website/client",
+      "npm install",
+      "npm run dev"
+    ],
+    "api_access": "In dev, requests to /api/* are proxied to http://localhost:3001 via vite.config.js.",
+    "see_docs": [
+      "../../docs/WEB_PLATFORM.md",
+      "../../docs/REPO_TOUR.md"
+    ]
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

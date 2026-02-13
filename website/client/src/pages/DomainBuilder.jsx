@@ -9,6 +9,23 @@ import Input from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import api from '../services/api';
 
+/**
+ * Domain Builder Page
+ *
+ * Purpose:
+ * - Provide a multi-step UI to define a “custom domain” (name, description, topics, question types, etc.)
+ * - Save that configuration via the backend API so it can be reused for generation
+ *
+ * Data flow (reality-aligned):
+ * - On save, calls `api.saveDomain(domainConfig)` → POST /api/domains
+ * - The demo backend stores domains in memory (lost on server restart)
+ *
+ * Educational notes:
+ * - The schema here is a "UI config schema" — it is not yet used by the demo backend to drive
+ *   real dataset generation. It's a good starting point for later integration.
+ * - Multi-step forms help users provide complex input without overwhelm, but add state complexity.
+ */
+
 const DomainBuilder = () => {
   const navigate = useNavigate();
   const { toast } = useToast();

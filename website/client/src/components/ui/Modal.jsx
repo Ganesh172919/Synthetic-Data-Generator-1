@@ -10,6 +10,25 @@ import { X } from 'lucide-react';
  * UX Decision: Uses backdrop blur and subtle animations to
  * create depth while maintaining context of the underlying page.
  * Traps focus within the modal for accessibility.
+ *
+ * Props (informal API):
+ * - `isOpen`: controls whether the modal is mounted
+ * - `onClose`: callback for closing (backdrop click / escape / close button)
+ * - `title`, `description`: used for accessible naming via aria-labelledby/aria-describedby
+ * - `size`: sm | md | lg | xl | full
+ * - `closeOnBackdrop`: allow clicking outside to close
+ * - `closeOnEscape`: allow Escape key to close
+ *
+ * Usage example:
+ *   <Modal isOpen={open} onClose={() => setOpen(false)} title="Export">
+ *     ...
+ *     <ModalActions>...</ModalActions>
+ *   </Modal>
+ *
+ * Edge cases:
+ * - If there are no focusable elements inside, the focus trap is skipped.
+ * - For complex modals, consider adding focus return behavior for all close paths
+ *   (this demo restores focus to the previously active element).
  */
 
 const Modal = ({

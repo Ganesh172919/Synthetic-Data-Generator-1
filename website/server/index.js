@@ -1,3 +1,30 @@
+/**
+ * SynthGen — Demo API Server (Express)
+ *
+ * What this server is:
+ * - A lightweight REST API that powers the web UI in `website/client/`
+ * - A teaching-friendly example of a "job" based workflow (start → poll → download)
+ *
+ * What this server is NOT (yet):
+ * - A production job runner
+ * - A durable job database (jobs/domains are stored in memory)
+ * - A real integration layer to the Python generators in `Pre-Work/`
+ *
+ * Reality-aligned behavior:
+ * - `POST /api/generate` creates an in-memory job and simulates progress via `setInterval`.
+ * - `GET /api/downloads/:jobId/:format` returns a *mock* dataset payload based on job config.
+ *
+ * Extension points (if you want "real generation"):
+ * - Replace `simulateProgress(jobId)` with a queue/worker model
+ * - Spawn `Pre-Work/universal_dataset_generator.py` (or similar) in a worker process
+ * - Persist job state (SQLite/Postgres) and stream real output files for downloads
+ *
+ * See also:
+ * - `docs/ARCHITECTURE.md`
+ * - `docs/WEB_PLATFORM.md`
+ * - `docs/SECURITY_AND_SAFETY.md`
+ */
+
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
@@ -81,16 +108,25 @@ const templates = [
 // Routes
 
 // Health check
+// GET /api/health
+// - Purpose: basic liveness check for the UI and local scripts
+// - Response: { status: "ok", timestamp: "..." }
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Get all templates
+// GET /api/templates
+// - Purpose: populate the Templates page in the UI
+// - Response: { templates: [...] }
 app.get('/api/templates', (req, res) => {
   res.json({ templates });
 });
 
 // Get template by ID
+// GET /api/templates/:id
+// - Purpose: fetch details for one template
+// - Edge cases: 404 if the id doesn't exist
 app.get('/api/templates/:id', (req, res) => {
   const template = templates.find(t => t.id === req.params.id);
   if (!template) {
@@ -104,6 +140,20 @@ const validDomains = ['financial', 'healthcare', 'legal', 'technology', 'science
 const validOutputFormats = ['jsonl', 'csv', 'parquet'];
 
 // Start generation job
+// POST /api/generate
+// Request body (example):
+//   {
+//     "domain": "technology",
+//     "targetCount": 1000,
+//     "batchSize": 25,
+//     "outputFormat": "jsonl"
+//   }
+//
+// Response (demo):
+//   { jobId, status: "running", estimatedTime: "10 minutes" }
+//
+// Reality note:
+// - This endpoint does not start real generation; it starts a simulated progress timer.
 app.post('/api/generate', (req, res) => {
   const { domain, targetCount, batchSize, outputFormat } = req.body;
   
@@ -154,6 +204,9 @@ app.post('/api/generate', (req, res) => {
 });
 
 // Get job status
+// GET /api/jobs/:jobId
+// - Purpose: polling endpoint for UI progress updates
+// - Edge cases: 404 if job doesn't exist; job state is in memory (lost on restart)
 app.get('/api/jobs/:jobId', (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) {
@@ -163,6 +216,9 @@ app.get('/api/jobs/:jobId', (req, res) => {
 });
 
 // List all jobs
+// GET /api/jobs
+// - Purpose: show a job list/history in the UI
+// - Reality note: this is limited to the current server process lifetime
 app.get('/api/jobs', (req, res) => {
   const allJobs = Array.from(jobs.values()).sort((a, b) => 
     new Date(b.createdAt) - new Date(a.createdAt)
@@ -171,6 +227,9 @@ app.get('/api/jobs', (req, res) => {
 });
 
 // Stop a running job
+// POST /api/jobs/:jobId/stop
+// - Purpose: stop the simulated progress timer and mark job as "stopped"
+// - Edge cases: 400 if job is not running
 app.post('/api/jobs/:jobId/stop', (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) {
@@ -195,6 +254,8 @@ app.post('/api/jobs/:jobId/stop', (req, res) => {
 });
 
 // Delete a job
+// DELETE /api/jobs/:jobId
+// - Purpose: remove job metadata from memory and clear any timers
 app.delete('/api/jobs/:jobId', (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) {
@@ -212,6 +273,17 @@ app.delete('/api/jobs/:jobId', (req, res) => {
 });
 
 // Download generated dataset (mock)
+// GET /api/downloads/:jobId/:format
+// - Purpose: download a dataset artifact when a job completes
+// - Reality note: this endpoint does not read a real file; it synthesizes a payload in memory.
+// - Formats:
+//   - jsonl: application/x-ndjson (one JSON object per line)
+//   - csv:  text/csv
+//   - json: application/json
+//
+// Edge cases:
+// - 400 if job is not completed yet
+// - This demo endpoint does not implement path traversal protection because it does not accept filenames.
 app.get('/api/downloads/:jobId/:format', (req, res) => {
   const { jobId, format } = req.params;
   const job = jobs.get(jobId);
@@ -276,6 +348,9 @@ function generateMockDataset(job) {
 }
 
 // Save custom domain
+// POST /api/domains
+// - Purpose: store a "custom domain" configuration built in the UI
+// - Reality note: stored in memory only; this is a demo persistence layer
 app.post('/api/domains', (req, res) => {
   const domainConfig = req.body;
   
@@ -315,6 +390,8 @@ app.post('/api/domains', (req, res) => {
 });
 
 // Get domain by ID
+// GET /api/domains/:id
+// - Purpose: fetch one custom domain config
 app.get('/api/domains/:id', (req, res) => {
   const domain = domains.get(req.params.id);
   if (!domain) {
@@ -324,6 +401,8 @@ app.get('/api/domains/:id', (req, res) => {
 });
 
 // List all domains
+// GET /api/domains
+// - Purpose: list all custom domains created since the server started
 app.get('/api/domains', (req, res) => {
   const allDomains = Array.from(domains.values());
   res.json({ domains: allDomains });
@@ -354,6 +433,10 @@ function simulateProgress(jobId) {
     
     if (currentJob.generated >= currentJob.targetCount) {
       currentJob.status = 'completed';
+      // Educational note:
+      // `downloadUrl` is illustrative metadata. The canonical download endpoint is:
+      //   GET /api/downloads/:jobId/:format
+      // Clients should construct URLs using (jobId, desiredFormat) rather than relying on this field.
       currentJob.downloadUrl = `/api/downloads/${jobId}.jsonl`;
       clearInterval(interval);
       jobIntervals.delete(jobId);
@@ -371,5 +454,12 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 API endpoints available at http://localhost:${PORT}/api`);
 });
+
+// Production hardening notes (non-executable):
+// - Add authentication/authorization before exposing the API beyond localhost.
+// - Persist jobs/domains to a database instead of in-memory Maps.
+// - Replace simulated progress with a durable queue + worker model.
+// - Stream real dataset files from disk/object storage in the downloads endpoint.
+// - Add rate limiting, request size limits, and structured logging for safety.
 
 module.exports = app;

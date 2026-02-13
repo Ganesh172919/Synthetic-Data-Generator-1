@@ -25,6 +25,14 @@ import { AnimatedSection } from '../hooks/useIntersectionObserver';
  * - Interactive hover effects
  * - Clear visual hierarchy for featured templates
  * - Improved search experience
+ *
+ * Data flow (reality-aligned):
+ * - On mount, attempts `GET /api/templates`.
+ * - If the API call fails, falls back to a local `defaultTemplates` array so the UI remains usable.
+ *
+ * Educational note:
+ * - This fallback pattern is great for demos, but in production you should surface
+ *   real error states and avoid silently diverging from server data.
  */
 const Templates = () => {
   const [templates, setTemplates] = useState([]);

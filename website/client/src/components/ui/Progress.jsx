@@ -5,6 +5,17 @@
  * 
  * UX Decision: Uses a gradient fill to create visual interest
  * and smooth transitions for perceived performance.
+ *
+ * Props (informal API):
+ * - `value` / `max`: numeric range (defaults 0–100)
+ * - `variant`: gradient | primary | success | warning | error | info
+ * - `size`: sm | md | lg
+ * - `showLabel`: displays percentage label above the bar
+ * - `animated`: toggles transition animation
+ *
+ * Accessibility notes:
+ * - Uses `role="progressbar"` + aria-valuenow/min/max for screen readers.
+ * - If progress is indeterminate, consider using a spinner pattern instead.
  */
 
 const Progress = ({

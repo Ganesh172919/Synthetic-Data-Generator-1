@@ -4,6 +4,23 @@ import {
   ChevronRight, Copy, Check, ExternalLink
 } from 'lucide-react';
 
+/**
+ * In-App Documentation Page
+ *
+ * Purpose:
+ * - Provide a friendly, navigable docs experience inside the web UI
+ * - Offer copyable command snippets for quick onboarding
+ *
+ * Reality-aligned notes:
+ * - Some URLs shown in the UI can be illustrative (e.g., a fictional hosted API base).
+ *   For local development, the demo API is at http://localhost:3001/api.
+ * - Treat this page as “product docs UI” rather than the canonical source of truth.
+ *   The repo’s Markdown docs in the root and `docs/` are easier to keep in sync.
+ *
+ * Extension idea:
+ * - Load Markdown files from `/docs` and render them to avoid duplication between UI docs and repo docs.
+ */
+
 const Documentation = () => {
   const [activeSection, setActiveSection] = useState('getting-started');
   const [copiedCode, setCopiedCode] = useState(null);

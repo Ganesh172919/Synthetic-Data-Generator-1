@@ -1,5 +1,20 @@
 const API_BASE = '/api';
 
+/**
+ * API Service (thin fetch wrapper)
+ *
+ * Educational notes:
+ * - The React UI should prefer calling these helpers instead of sprinkling `fetch(...)` everywhere.
+ *   This keeps error handling and URL construction consistent.
+ * - In development, `/api/*` is proxied to the Express server via `vite.config.js`.
+ * - Error shape expectation: the demo API usually returns `{ "error": "..." }` for non-2xx responses.
+ *
+ * Edge cases to be aware of:
+ * - Some failures return non-JSON bodies (HTML error pages, empty responses). `handleResponse`
+ *   tries to parse JSON and falls back to a generic message.
+ * - Network failures throw before `response.ok` exists; callers should catch and show UX feedback.
+ */
+
 // Helper function to handle API responses
 const handleResponse = async (response) => {
   if (!response.ok) {

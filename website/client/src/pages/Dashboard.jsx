@@ -29,6 +29,15 @@ import api from '../services/api';
  * - Toast notifications for feedback
  * - Better visual hierarchy
  * - Responsive stat cards
+ *
+ * Data flow (reality-aligned):
+ * - Attempts `POST /api/generate` to create a job.
+ * - If the API is unavailable, falls back to a demo-mode job entry and client-side progress simulation.
+ * - For exports/downloads, constructs URLs with `api.getDownloadUrl(jobId, format)`.
+ *
+ * Important mismatch to notice (educational):
+ * - The UI offers "parquet" as an output format, but the demo backend does not emit parquet downloads.
+ *   Treat parquet as a placeholder for future implementation.
  */
 /**
  * Simple SVG Sparkline Component
@@ -121,6 +130,10 @@ const Dashboard = () => {
 
   const handleStartGeneration = useCallback(async () => {
     try {
+      // Educational note:
+      // This uses `fetch` directly instead of the wrapper in `src/services/api.js` so the page
+      // can demonstrate explicit request/response handling. In a production app, prefer the
+      // shared API wrapper for consistent error behavior.
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

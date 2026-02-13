@@ -19,6 +19,27 @@ EXTREME Optimizations:
 - Catches Ctrl+C, Colab disconnect, errors
 - Download anytime with: force_save_and_download() or download_now()
 
+Reality-aligned notes (important for learners):
+
+- This script is optimized for *throughput*, not for “perfect” output quality.
+  It intentionally relaxes some checks so it can hit high Q&A/minute targets.
+- It auto-installs dependencies on import. This is convenient on Google Colab, but
+  in controlled environments you typically want explicit, pinned installs.
+- `flash-attn` (Flash Attention 2) can fail to install depending on CUDA/toolchain
+  and often fails on Windows. The script continues without it.
+- Finance content can look authoritative while being wrong. Treat outputs as
+  synthetic educational text, not financial advice.
+
+Conceptual flow (simplified):
+
+  install deps
+    → load quantized model (optionally Flash Attention)
+    → generate mega-batches (25 Q&A per call)
+    → fast parse + lightweight validation
+    → hash dedup (exact-ish)
+    → async buffered writer
+    → periodic checkpoint + emergency-save handlers
+
 Usage:
 !python financial_education_generator_ultra.py
 """
@@ -31,7 +52,14 @@ import subprocess
 import sys
 
 def install_dependencies():
-    """Install required packages."""
+    """
+    Install required packages.
+
+    Educational note:
+    - This script is often run in Colab, so it tries to self-bootstrap dependencies.
+    - `flash-attn` is optional and may fail to build; failures are intentionally ignored.
+    - If you want reproducibility, create a pinned requirements file instead.
+    """
     packages = [
         "transformers>=4.36.0",
         "accelerate>=0.25.0",
@@ -210,7 +238,22 @@ def setup_emergency_handlers():
 
 @dataclass
 class ExtremeSpeedConfig:
-    """Extreme speed configuration for 30k in 3 hours."""
+    """
+    Extreme speed configuration for 30k in 3 hours.
+
+    Educational note (how to read these knobs):
+    - `qa_per_generation` drives how many Q&As you ask for per model call.
+      Higher = fewer model calls (faster) but higher risk of format drift.
+    - `parallel_workers` suggests parallelism, but on a single GPU true parallel
+      generation is often limited; see `ParallelBatchProcessor` notes.
+    - `save_interval` and the async writer buffer help keep generation compute-bound.
+    - `use_flash_attention` can improve throughput but is optional and environment-dependent.
+
+    Practical tuning examples (starting points):
+    - Colab T4: qa_per_generation=10–20, parallel_workers=1–2, max_new_tokens=1200–1800
+    - RTX 3090/4090: qa_per_generation=20–30, parallel_workers=1–2, max_new_tokens=1800–2500
+    - CPU-only: not recommended for this “ultra” profile; use smaller targets or the universal generator.
+    """
     
     # Model - Options for speed (uncomment preferred)
     # Option 1: Mistral-7B (better quality, slower)
@@ -245,6 +288,22 @@ class ExtremeSpeedConfig:
 
 
 CONFIG = ExtremeSpeedConfig()
+
+# Practical tuning quick guide (non-executable notes):
+#
+# 1) If you hit CUDA OOM:
+#    - reduce CONFIG.qa_per_generation
+#    - reduce CONFIG.max_new_tokens
+#    - increase CONFIG.clear_cache_interval frequency (smaller number)
+#
+# 2) If output quality is low / format drifts:
+#    - reduce CONFIG.temperature
+#    - reduce CONFIG.qa_per_generation
+#    - tighten prompt rules in `UltraFastQAGenerator.generate_mega_batch`
+#
+# 3) If generation is slow but stable:
+#    - increase CONFIG.qa_per_generation gradually
+#    - ensure quantization is enabled (CONFIG.use_quantization=True)
 
 # ============================================================================
 # SECTION 4: EXPANDED CURRICULUM (More subtopics = more diversity)
@@ -364,6 +423,13 @@ QUESTION_TYPES = ["definition", "conceptual", "comparison", "example", "applicat
 
 @dataclass
 class QAPair:
+    """
+    A single Q&A record emitted by the finance generator.
+
+    Educational note:
+    - Keeping a dedicated data structure makes it easier to evolve the schema over time.
+    - `to_jsonl()` emits one JSON object suitable for JSON Lines (one record per line).
+    """
     id: str
     topic: str
     subtopic: str
@@ -424,7 +490,17 @@ class ThreadSafeSet:
 
 
 class UltraAsyncWriter:
-    """Ultra high-performance async file writer with large buffers."""
+    """
+    Ultra high-performance async file writer with large buffers.
+
+    Why this exists (educational note):
+    - High-volume generation can become I/O-bound if every record is written synchronously.
+    - We use a queue + background thread to batch writes and reduce syscalls.
+
+    Edge cases:
+    - If generation outpaces disk writes, the queue can fill and backpressure occurs.
+    - Always call `stop()` (or rely on emergency handlers) to flush buffers on exit.
+    """
     
     def __init__(self, filepath: str, buffer_size: int = 200):
         self.filepath = filepath
@@ -475,6 +551,7 @@ class UltraAsyncWriter:
             self.queue.put_nowait(qa_pair.to_jsonl())
         except queue.Full:
             # Force flush if queue is full
+            # Reality note: this is backpressure (we wait briefly, then block on `put`).
             time.sleep(0.1)
             self.queue.put(qa_pair.to_jsonl())
     
@@ -496,7 +573,19 @@ class UltraAsyncWriter:
 # ============================================================================
 
 class ExtremeModelManager:
-    """Ultra-optimized model manager with Flash Attention."""
+    """
+    Ultra-optimized model manager with optional Flash Attention.
+
+    Responsibilities:
+    - load tokenizer + model (optionally quantized)
+    - choose attention implementation (Flash Attention 2 if available)
+    - provide a `generate(prompt)` method used by the Q&A generator
+
+    Educational note:
+    Even if you “parallelize” upstream (threads), most single-GPU inference ends up
+    serialized by the model/generation lock. This script focuses on minimizing per-call
+    overhead and maximizing output per call (mega-batching).
+    """
     
     def __init__(self, config: ExtremeSpeedConfig):
         self.config = config
@@ -513,6 +602,8 @@ class ExtremeModelManager:
             print(f"🎮 GPU: {torch.cuda.get_device_name(0)} ({gpu_mem:.1f} GB)")
         else:
             print("⚠️ No GPU! This will be VERY slow. Use Google Colab with GPU.")
+            # Educational note: this ultra profile is tuned for GPU throughput and intentionally
+            # does not provide a robust CPU fallback path.
             return
         
         # Quantization config
@@ -533,6 +624,8 @@ class ExtremeModelManager:
                 attn_implementation = "flash_attention_2"
                 print("⚡ Flash Attention 2 enabled!")
             except ImportError:
+                # Flash Attention is an optional acceleration. If it cannot be imported (common on
+                # some platforms/toolchains), we fall back to default attention implementation.
                 print("⚠️ Flash Attention not available, using default")
         
         # Load tokenizer
@@ -621,7 +714,18 @@ class ExtremeModelManager:
 # ============================================================================
 
 class UltraFastQAGenerator:
-    """Generates many Q&A pairs per LLM call with optimized prompts."""
+    """
+    Generates many Q&A pairs per LLM call with optimized prompts.
+
+    Educational note:
+    This class is the core throughput trick:
+    - Instead of 1 model call per record, we ask for many Q&As in a strict format.
+    - We then parse the raw text quickly and apply lightweight checks.
+
+    Common failure modes:
+    - Format drift: missing Q/A markers, merged answers, extra commentary.
+    - Repetition: multiple Q&As that are near-duplicates within the same mega-batch.
+    """
     
     def __init__(self, model: ExtremeModelManager, config: ExtremeSpeedConfig):
         self.model = model
@@ -741,7 +845,19 @@ A2: [answer]
 # ============================================================================
 
 class ParallelBatchProcessor:
-    """Processes multiple batches in parallel for maximum throughput."""
+    """
+    Processes multiple batches with a “parallel” API surface.
+
+    Reality-aligned note:
+    The current implementation is effectively sequential on a single GPU. True parallel
+    generation typically requires either:
+    - multiple GPUs
+    - async batching at the inference server level
+    - or model-level support for concurrent generation requests
+
+    The educational value of this class is that it isolates the “batch spec planning”
+    from the generation mechanics, making it easier to upgrade later.
+    """
     
     def __init__(self, qa_generator: UltraFastQAGenerator, config: ExtremeSpeedConfig):
         self.qa_gen = qa_generator
@@ -765,7 +881,20 @@ class ParallelBatchProcessor:
 # ============================================================================
 
 class ExtremeFinancialGenerator:
-    """Main ultra-fast generator for 30k/3hrs."""
+    """
+    Main ultra-fast generator orchestrator (target: 30k / ~3 hours).
+
+    Responsibilities:
+    - initialize emergency handlers (so you can always save/download)
+    - load the model manager and Q&A generator
+    - run the generate → validate/dedup → write loop
+    - periodically checkpoint and clear GPU cache
+
+    Educational note:
+    This is a “single-process pipeline” optimized for simplicity. In production you’d
+    usually separate concerns (API → queue → worker → storage) and add stronger safety
+    filters for finance-related content.
+    """
     
     def __init__(self, config: ExtremeSpeedConfig):
         self.config = config

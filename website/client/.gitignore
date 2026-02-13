@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Educational notes:
+# - `dist/` is the output of `npm run build` (static assets). It should be built in CI/CD.
+# - `*.local` is a common convention for machine-specific settings; avoid committing it.
+# - Keeping `.vscode/extensions.json` is a handy way to recommend editor plugins without committing personal settings.
