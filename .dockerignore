@@ -1,0 +1,9 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.venv
+**/node_modules
+**/dist
+website/server/data
+tmp_*.log

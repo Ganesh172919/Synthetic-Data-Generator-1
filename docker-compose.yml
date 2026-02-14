@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: website/server/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      DATA_DIR: /data
+      SQLITE_PATH: /data/synthgen.sqlite
+      OUTPUTS_DIR: /data/outputs
+      DEFAULT_PROVIDER: mock
+      AUTH_MODE: none
+    volumes:
+      - ./website/server/data:/data
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    environment:
+      DATA_DIR: /data
+      SQLITE_PATH: /data/synthgen.sqlite
+      OUTPUTS_DIR: /data/outputs
+      POLL_INTERVAL_MS: 1000
+      PROGRESS_UPDATE_INTERVAL_MS: 2000
+      MAX_CONCURRENT_JOBS: 1
+    volumes:
+      - ./website/server/data:/data
+    depends_on:
+      - api
+    restart: unless-stopped

@@ -1,85 +1,80 @@
 const API_BASE = '/api';
 
-/**
- * API Service (thin fetch wrapper)
- *
- * Educational notes:
- * - The React UI should prefer calling these helpers instead of sprinkling `fetch(...)` everywhere.
- *   This keeps error handling and URL construction consistent.
- * - In development, `/api/*` is proxied to the Express server via `vite.config.js`.
- * - Error shape expectation: the demo API usually returns `{ "error": "..." }` for non-2xx responses.
- *
- * Edge cases to be aware of:
- * - Some failures return non-JSON bodies (HTML error pages, empty responses). `handleResponse`
- *   tries to parse JSON and falls back to a generic message.
- * - Network failures throw before `response.ok` exists; callers should catch and show UX feedback.
- */
+const buildQuery = (params = {}) => {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
+  });
+  const query = search.toString();
+  return query ? `?${query}` : '';
+};
 
-// Helper function to handle API responses
 const handleResponse = async (response) => {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    throw new Error(error.error || `HTTP error ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return null;
   }
   return response.json();
 };
 
 export const api = {
-  // Health check
   checkHealth: async () => {
     const response = await fetch(`${API_BASE}/health`);
     return handleResponse(response);
   },
 
-  // Generate dataset
   startGeneration: async (config) => {
     const response = await fetch(`${API_BASE}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config)
+      body: JSON.stringify(config),
     });
     return handleResponse(response);
   },
 
-  // Get job status
   getJobStatus: async (jobId) => {
     const response = await fetch(`${API_BASE}/jobs/${jobId}`);
     return handleResponse(response);
   },
 
-  // List all jobs
-  listJobs: async () => {
-    const response = await fetch(`${API_BASE}/jobs`);
+  listJobs: async (params = {}) => {
+    const response = await fetch(`${API_BASE}/jobs${buildQuery(params)}`);
     return handleResponse(response);
   },
 
-  // Stop a job
   stopJob: async (jobId) => {
-    if (!jobId || typeof jobId !== 'string') {
-      throw new Error('Invalid jobId');
-    }
     const response = await fetch(`${API_BASE}/jobs/${jobId}/stop`, {
-      method: 'POST'
+      method: 'POST',
     });
     return handleResponse(response);
   },
 
-  // Delete a job
+  retryJob: async (jobId) => {
+    const response = await fetch(`${API_BASE}/jobs/${jobId}/retry`, {
+      method: 'POST',
+    });
+    return handleResponse(response);
+  },
+
   deleteJob: async (jobId) => {
-    if (!jobId || typeof jobId !== 'string') {
-      throw new Error('Invalid jobId');
-    }
     const response = await fetch(`${API_BASE}/jobs/${jobId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
     });
     return handleResponse(response);
   },
 
-  // Download dataset
+  getJobPreview: async (jobId, limit = 20) => {
+    const response = await fetch(`${API_BASE}/jobs/${jobId}/preview${buildQuery({ limit })}`);
+    return handleResponse(response);
+  },
+
   getDownloadUrl: (jobId, format = 'jsonl') => {
-    if (!jobId || typeof jobId !== 'string') {
-      throw new Error('Invalid jobId');
-    }
     const validFormats = ['jsonl', 'csv', 'json'];
     if (!validFormats.includes(format)) {
       throw new Error('Invalid format. Use jsonl, csv, or json');
@@ -87,45 +82,38 @@ export const api = {
     return `${API_BASE}/downloads/${jobId}/${format}`;
   },
 
-  // List templates
+  streamJobEvents: (jobId, sinceId = 0) => {
+    return new EventSource(`${API_BASE}/jobs/${jobId}/events${buildQuery({ sinceId })}`);
+  },
+
   getTemplates: async () => {
     const response = await fetch(`${API_BASE}/templates`);
     return handleResponse(response);
   },
 
-  // Get template by ID
   getTemplate: async (templateId) => {
-    if (!templateId || typeof templateId !== 'string') {
-      throw new Error('Invalid templateId');
-    }
     const response = await fetch(`${API_BASE}/templates/${templateId}`);
     return handleResponse(response);
   },
 
-  // Save custom domain
   saveDomain: async (domainConfig) => {
     const response = await fetch(`${API_BASE}/domains`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(domainConfig)
+      body: JSON.stringify(domainConfig),
     });
     return handleResponse(response);
   },
 
-  // Get domain by ID
   getDomain: async (domainId) => {
-    if (!domainId || typeof domainId !== 'string') {
-      throw new Error('Invalid domainId');
-    }
     const response = await fetch(`${API_BASE}/domains/${domainId}`);
     return handleResponse(response);
   },
 
-  // List all domains
   listDomains: async () => {
     const response = await fetch(`${API_BASE}/domains`);
     return handleResponse(response);
-  }
+  },
 };
 
 export default api;

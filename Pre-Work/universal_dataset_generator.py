@@ -5,14 +5,14 @@ A highly optimized, flexible synthetic data generator that takes ANY user prompt
 and generates complete datasets for any use case.
 
 Features:
-✅ Universal prompt-based generation (any domain/use case)
-✅ Optimized batch processing for speed
-✅ Thread-safe async file writing
-✅ Deduplication with hash-based filtering
-✅ Progress tracking with auto-save
-✅ Multiple output formats (JSONL, CSV, JSON)
-✅ Configurable dataset size and quality settings
-✅ Support for local models (HuggingFace) and APIs (OpenAI, etc.)
+??? Universal prompt-based generation (any domain/use case)
+??? Optimized batch processing for speed
+??? Thread-safe async file writing
+??? Deduplication with hash-based filtering
+??? Progress tracking with auto-save
+??? Multiple output formats (JSONL, CSV, JSON)
+??? Configurable dataset size and quality settings
+??? Support for local models (HuggingFace) and APIs (OpenAI, etc.)
 
 Reality-aligned notes (important for learners):
 
@@ -54,7 +54,7 @@ def install_dependencies():
     Install required packages quietly.
 
     Educational note:
-    - This “auto-install on import” pattern is convenient for Colab notebooks and quick demos.
+    - This ???auto-install on import??? pattern is convenient for Colab notebooks and quick demos.
     - In production or controlled environments, you usually want a pinned `requirements.txt`
       and explicit installs (auto-install can be slow and surprising).
     - Errors are swallowed on purpose here so the script can still run in "MOCK" mode even
@@ -68,7 +68,7 @@ def install_dependencies():
         "tqdm",
         "openai",
     ]
-    print("📦 Installing dependencies...")
+    print("???? Installing dependencies...")
     for pkg in packages:
         try:
             subprocess.check_call(
@@ -78,10 +78,35 @@ def install_dependencies():
             )
         except Exception:
             pass
-    print("✅ Dependencies ready!\n")
+    print("??? Dependencies ready!\n")
 
-# Auto-install on import (see docstring above for tradeoffs).
-install_dependencies()
+def _running_in_colab() -> bool:
+    """Detect Google Colab runtime."""
+    try:
+        import os as _os
+        return "google.colab" in sys.modules or bool(_os.environ.get("COLAB_GPU"))
+    except Exception:
+        return False
+
+
+def _should_auto_install() -> bool:
+    """
+    Auto-install policy:
+    - Enabled in Colab.
+    - Enabled when `SYNTHGEN_AUTO_INSTALL=1`.
+    - Enabled when CLI flag `--auto-install` is present.
+    """
+    try:
+        import os as _os
+        if _os.environ.get("SYNTHGEN_AUTO_INSTALL") == "1":
+            return True
+    except Exception:
+        pass
+    return "--auto-install" in sys.argv or _running_in_colab()
+
+
+if _should_auto_install():
+    install_dependencies()
 
 import os
 import json
@@ -317,7 +342,7 @@ class AsyncFileWriter:
             
             self._written.increment(len(buffer))
         except Exception as e:
-            print(f"\n⚠️ Write error: {e}")
+            print(f"\n?????? Write error: {e}")
     
     def write(self, item: DataItem):
         try:
@@ -410,13 +435,13 @@ class HuggingFaceBackend(BaseModelBackend):
         if not HF_AVAILABLE:
             raise ImportError("HuggingFace transformers not available")
         
-        print(f"🔄 Loading model: {self.config.model_name}")
+        print(f"???? Loading model: {self.config.model_name}")
         
         if self.device == "cuda":
             gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9
-            print(f"🎮 GPU: {torch.cuda.get_device_name(0)} ({gpu_mem:.1f} GB)")
+            print(f"???? GPU: {torch.cuda.get_device_name(0)} ({gpu_mem:.1f} GB)")
         else:
-            print("⚠️ Running on CPU - generation will be slower")
+            print("?????? Running on CPU - generation will be slower")
         
         # Quantization config for efficiency
         quant_config = None
@@ -456,7 +481,7 @@ class HuggingFaceBackend(BaseModelBackend):
         )
         self.model.eval()
         
-        print(f"✅ Model loaded successfully!")
+        print(f"??? Model loaded successfully!")
     
     @torch.inference_mode()
     def generate(self, prompt: str) -> str:
@@ -490,7 +515,7 @@ class HuggingFaceBackend(BaseModelBackend):
                 return self.tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True).strip()
             
             except Exception as e:
-                print(f"\n❌ Generation error: {e}")
+                print(f"\n??? Generation error: {e}")
                 return ""
     
     def clear_cache(self):
@@ -515,7 +540,7 @@ class OpenAIBackend(BaseModelBackend):
             raise ValueError("OPENAI_API_KEY environment variable not set")
         
         self.client = OpenAI(api_key=api_key)
-        print(f"✅ OpenAI client initialized with model: {self.config.openai_model}")
+        print(f"??? OpenAI client initialized with model: {self.config.openai_model}")
     
     def generate(self, prompt: str) -> str:
         try:
@@ -531,7 +556,7 @@ class OpenAIBackend(BaseModelBackend):
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"\n❌ OpenAI error: {e}")
+            print(f"\n??? OpenAI error: {e}")
             return ""
 
 
@@ -540,16 +565,22 @@ class MockBackend(BaseModelBackend):
     
     def __init__(self, config: GeneratorConfig):
         self.config = config
+        self._call_count = 0
     
     def load(self):
-        print("✅ Mock backend loaded (for testing)")
+        print("??? Mock backend loaded (for testing)")
     
     def generate(self, prompt: str) -> str:
-        # Generate dummy responses for testing
+        # Generate deterministic-but-unique responses for testing.
+        self._call_count += 1
+        batch_tag = int(time.time() * 1000) + self._call_count
         items = []
         for i in range(self.config.items_per_batch):
-            items.append(f"Q{i+1}: Sample question about the topic?")
-            items.append(f"A{i+1}: This is a comprehensive answer with detailed explanation. " * 5)
+            item_id = f"{batch_tag}_{i+1}"
+            items.append(f"Q{i+1}: Sample question {item_id} about the topic?")
+            items.append(
+                f"A{i+1}: This is a comprehensive answer {item_id} with detailed explanation. " * 3
+            )
             items.append("")
         return "\n".join(items)
 
@@ -771,19 +802,19 @@ def emergency_save():
     if _emergency_save_done:
         return
     
-    print("\n\n🚨 EMERGENCY SAVE TRIGGERED...")
+    print("\n\n???? EMERGENCY SAVE TRIGGERED...")
     
     if _global_writer:
         try:
             _global_writer.stop()
-            print(f"✅ Data saved: {_global_writer.get_written_count()} items")
+            print(f"??? Data saved: {_global_writer.get_written_count()} items")
         except Exception:
             pass
     
     if _global_generator:
         try:
             _global_generator._save_checkpoint()
-            print("✅ Checkpoint saved!")
+            print("??? Checkpoint saved!")
         except Exception:
             pass
     
@@ -853,6 +884,9 @@ class UniversalGenerator:
         }
         
         try:
+            checkpoint_dir = os.path.dirname(self.config.checkpoint_file)
+            if checkpoint_dir:
+                os.makedirs(checkpoint_dir, exist_ok=True)
             with open(self.config.checkpoint_file, 'w') as f:
                 json.dump(checkpoint, f)
         except Exception:
@@ -880,7 +914,7 @@ class UniversalGenerator:
                             pass
             
             count = data.get("generated", 0)
-            print(f"📂 Resuming from checkpoint: {count} items")
+            print(f"???? Resuming from checkpoint: {count} items")
             return count
         except Exception:
             return 0
@@ -943,38 +977,96 @@ class UniversalGenerator:
         
         return items
     
+    def _build_progress_payload(self, status: str = "running") -> Dict[str, Any]:
+        """Build a structured progress payload for callbacks and worker integrations."""
+        generated = self.generated.get()
+        elapsed = max(0.0, time.time() - self.start_time) if self.start_time else 0.0
+        rate = (generated / elapsed) if elapsed > 0 else 0.0
+        remaining = max(0, self.config.target_size - generated)
+        eta_seconds = int(remaining / rate) if rate > 0 else None
+
+        return {
+            "status": status,
+            "generated_count": generated,
+            "target_count": self.config.target_size,
+            "duplicates_count": self.duplicates.get(),
+            "invalid_count": self.errors.get(),
+            "rate_items_per_sec": rate,
+            "eta_seconds": eta_seconds,
+            "elapsed_seconds": int(elapsed),
+            "output_path": self._get_output_path(),
+            "checkpoint_file": self.config.checkpoint_file,
+        }
+
     def _print_progress(self, batch_num: int):
         """Print generation progress."""
-        generated = self.generated.get()
-        elapsed = time.time() - self.start_time
-        rate = generated / elapsed if elapsed > 0 else 0
-        eta_seconds = (self.config.target_size - generated) / rate if rate > 0 else 0
-        
+        payload = self._build_progress_payload("running")
+        generated = payload["generated_count"]
+        rate = payload["rate_items_per_sec"]
+        eta_seconds = payload["eta_seconds"]
+
         progress_pct = (generated / self.config.target_size) * 100
         bar_filled = int(progress_pct / 5)
-        bar = "█" * bar_filled + "░" * (20 - bar_filled)
-        
-        eta_str = f"{int(eta_seconds // 60)}m {int(eta_seconds % 60)}s" if eta_seconds < 3600 else f"{eta_seconds / 3600:.1f}h"
-        
-        print(f"\r📊 [{bar}] {progress_pct:.1f}% | {generated:,}/{self.config.target_size:,} | "
-              f"Rate: {rate:.1f}/s | ETA: {eta_str} | Dups: {self.duplicates.get()}", end="", flush=True)
-    
-    def run(self, 
-            user_prompt: Optional[str] = None,
-            parse_mode: str = "qa",
-            extra_fields: Optional[List[str]] = None):
+        bar = "#" * bar_filled + "-" * (20 - bar_filled)
+
+        if eta_seconds is None:
+            eta_str = "n/a"
+        elif eta_seconds < 3600:
+            eta_str = f"{int(eta_seconds // 60)}m {int(eta_seconds % 60)}s"
+        else:
+            eta_str = f"{eta_seconds / 3600:.1f}h"
+
+        print(
+            f"\r[Progress] [{bar}] {progress_pct:.1f}% | {generated:,}/{self.config.target_size:,} | "
+            f"Rate: {rate:.1f}/s | ETA: {eta_str} | Dups: {payload['duplicates_count']} | Batch: {batch_num}",
+            end="",
+            flush=True
+        )
+
+    def run(
+        self,
+        user_prompt: Optional[str] = None,
+        parse_mode: str = "qa",
+        extra_fields: Optional[List[str]] = None,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
+        non_interactive: bool = False
+    ) -> Dict[str, Any]:
         """
         Run the dataset generation.
-        
+
         Args:
-            user_prompt: Description of what data to generate
-            parse_mode: 'qa' for Q&A, 'text' for paragraphs, 'json' for structured
-            extra_fields: For json mode, list of field names to generate
+            user_prompt: Description of what data to generate.
+            parse_mode: 'qa' for Q&A, 'text' for paragraphs, 'json' for structured objects.
+            extra_fields: For json mode, list of field names to generate.
+            progress_callback: Optional callback called with structured progress dicts.
+            should_stop: Optional callback checked at least once per batch.
+            non_interactive: If True, never prompt via input().
         """
-        # Get user prompt if not provided
+        error_message = None
+        final_status = "failed"
+
+        def emit_progress(status: str):
+            if not progress_callback:
+                return
+            try:
+                progress_callback(self._build_progress_payload(status))
+            except Exception:
+                pass
+
         if user_prompt is None:
+            if non_interactive:
+                error_message = "Prompt is required in non-interactive mode."
+                return {
+                    "status": "failed",
+                    "generated_count": self.generated.get(),
+                    "duplicates_count": self.duplicates.get(),
+                    "invalid_count": self.errors.get(),
+                    "error_message": error_message,
+                }
+
             print("=" * 60)
-            print("🚀 UNIVERSAL SYNTHETIC DATASET GENERATOR")
+            print("UNIVERSAL SYNTHETIC DATASET GENERATOR")
             print("=" * 60)
             print("\nEnter your data generation prompt.")
             print("Examples:")
@@ -982,150 +1074,167 @@ class UniversalGenerator:
             print("  - 'Create customer service conversations for a bank'")
             print("  - 'Generate product descriptions for electronics'")
             print()
-            user_prompt = input("📝 Enter your prompt: ").strip()
-            
+            user_prompt = input("Enter your prompt: ").strip()
+
             if not user_prompt:
-                print("❌ No prompt provided. Exiting.")
-                return
-            
-            # Get additional settings
-            print("\n📊 Configuration:")
-            
-            # Target size
+                error_message = "No prompt provided."
+                return {
+                    "status": "failed",
+                    "generated_count": self.generated.get(),
+                    "duplicates_count": self.duplicates.get(),
+                    "invalid_count": self.errors.get(),
+                    "error_message": error_message,
+                }
+
+            print("\nConfiguration:")
+
             size_input = input(f"   Target dataset size [{self.config.target_size}]: ").strip()
             if size_input.isdigit():
                 self.config.target_size = int(size_input)
-            
-            # Parse mode
-            mode_input = input("   Output format - qa/text/json [qa]: ").strip().lower()
+
+            mode_input = input("   Output mode - qa/text/json [qa]: ").strip().lower()
             if mode_input in ["qa", "text", "json"]:
                 parse_mode = mode_input
-            
-            # Output format
+
             fmt_input = input("   File format - jsonl/json/csv [jsonl]: ").strip().lower()
             if fmt_input in ["jsonl", "json", "csv"]:
                 self.config.output_format = fmt_input
-            
-            # Output filename
+
             name_input = input(f"   Output filename [{self.config.output_file}]: ").strip()
             if name_input:
                 self.config.output_file = name_input
-            
-            # Extra fields for JSON mode
+
             if parse_mode == "json":
                 fields_input = input("   Fields to generate (comma-separated): ").strip()
                 if fields_input:
                     extra_fields = [f.strip() for f in fields_input.split(",")]
-        
-        self.user_prompt = user_prompt
+
+        self.user_prompt = user_prompt or ""
         self.parse_mode = parse_mode
         self.extra_fields = extra_fields or []
-        
-        # Initialize
+
         print("\n" + "=" * 60)
-        print("🔧 INITIALIZING...")
+        print("INITIALIZING...")
         print("=" * 60)
-        
-        # Load backend
+
         self.backend = get_backend(self.config)
         self.backend.load()
-        
-        # Setup writer
+
         output_path = self._get_output_path()
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         self.writer = AsyncFileWriter(output_path, self.config.output_format)
-        
-        # Setup handlers
+
         self._setup_handlers()
-        
-        # Load checkpoint
+
         existing_count = self._load_checkpoint()
         self.generated.set(existing_count)
-        
+
         remaining = self.config.target_size - existing_count
         if remaining <= 0:
-            print(f"✅ Dataset already complete! {existing_count} items exist.")
-            return
-        
-        print(f"\n📊 Generation Plan:")
-        print(f"   • Prompt: {user_prompt[:50]}...")
-        print(f"   • Mode: {parse_mode}")
-        print(f"   • Target: {self.config.target_size:,} items")
-        print(f"   • Remaining: {remaining:,} items")
-        print(f"   • Batch size: {self.config.items_per_batch}")
-        print(f"   • Output: {output_path}")
+            final_status = "completed"
+            emit_progress(final_status)
+            print(f"Dataset already complete! {existing_count} items exist.")
+            summary = self._build_progress_payload(final_status)
+            summary["error_message"] = None
+            return summary
+
+        print("\nGeneration Plan:")
+        print(f"   - Prompt: {self.user_prompt[:50]}...")
+        print(f"   - Mode: {parse_mode}")
+        print(f"   - Target: {self.config.target_size:,} items")
+        print(f"   - Remaining: {remaining:,} items")
+        print(f"   - Batch size: {self.config.items_per_batch}")
+        print(f"   - Output: {output_path}")
         print()
-        
-        # Start generation
+
         self.start_time = time.time()
         self.last_save_time = time.time()
+        next_save_at_count = self.generated.get() + max(1, self.config.save_interval)
         batch_num = 0
-        
-        print("🚀 Starting generation...\n")
-        
+        stop_requested = False
+
+        emit_progress("running")
+        print("Starting generation...\n")
+
         try:
-            # Run-loop diagram (conceptual):
-            #
-            #   while generated < target:
-            #     1) build prompt for parse_mode
-            #     2) backend.generate(prompt) -> raw text
-            #     3) parse raw text -> candidate records
-            #     4) validate length/format + dedup via hash set
-            #     5) enqueue writes (async writer)
-            #     6) periodically checkpoint + clear cache
             while self.generated.get() < self.config.target_size:
-                # Generate batch
+                if should_stop and should_stop():
+                    stop_requested = True
+                    print("\n\nStop requested. Finalizing...")
+                    break
+
                 items = self._generate_batch()
-                
+
                 if items:
+                    remaining_slots = max(0, self.config.target_size - self.generated.get())
+                    if remaining_slots < len(items):
+                        items = items[:remaining_slots]
                     self.writer.write_batch(items)
                     self.generated.increment(len(items))
-                
+
                 batch_num += 1
-                
-                # Print progress
                 self._print_progress(batch_num)
-                
-                # Auto-save checkpoint
-                if time.time() - self.last_save_time > self.config.auto_save_seconds:
+                emit_progress("running")
+
+                save_due_to_time = time.time() - self.last_save_time > self.config.auto_save_seconds
+                save_due_to_items = self.generated.get() >= next_save_at_count
+                if save_due_to_time or save_due_to_items:
                     self._save_checkpoint()
                     self.last_save_time = time.time()
-                
-                # Clear cache periodically
+                    if save_due_to_items:
+                        next_save_at_count = self.generated.get() + max(1, self.config.save_interval)
+
                 if batch_num % self.config.clear_cache_interval == 0:
                     self.backend.clear_cache()
-        
+
+            if stop_requested:
+                final_status = "stopped"
+            elif self.generated.get() >= self.config.target_size:
+                final_status = "completed"
+            else:
+                final_status = "stopped"
+
         except KeyboardInterrupt:
-            print("\n\n⚠️ Interrupted by user")
+            final_status = "stopped"
+            print("\n\nInterrupted by user")
         except Exception as e:
-            print(f"\n\n❌ Error: {e}")
+            final_status = "failed"
+            error_message = str(e)
+            print(f"\n\nError: {e}")
         finally:
-            # Cleanup
             print("\n\n" + "=" * 60)
-            print("📦 FINALIZING...")
+            print("FINALIZING...")
             print("=" * 60)
-            
+
             if self.writer:
                 self.writer.stop()
-            
+
             self._save_checkpoint()
-            
-            # Final stats
-            elapsed = time.time() - self.start_time
+
+            elapsed = max(0.0001, time.time() - self.start_time) if self.start_time else 0.0001
             final_count = self.generated.get()
-            
-            print(f"\n✅ GENERATION COMPLETE!")
-            print(f"   • Total items: {final_count:,}")
-            print(f"   • Duplicates skipped: {self.duplicates.get():,}")
-            print(f"   • Time elapsed: {elapsed/60:.1f} minutes")
-            print(f"   • Average rate: {final_count/elapsed:.1f} items/second")
-            print(f"   • Output file: {output_path}")
-            
-            # File size
+
+            print(f"\nStatus: {final_status}")
+            print(f"   - Total items: {final_count:,}")
+            print(f"   - Duplicates skipped: {self.duplicates.get():,}")
+            print(f"   - Time elapsed: {elapsed/60:.1f} minutes")
+            print(f"   - Average rate: {final_count/elapsed:.1f} items/second")
+            print(f"   - Output file: {output_path}")
+
             if os.path.exists(output_path):
                 size_mb = os.path.getsize(output_path) / (1024 * 1024)
-                print(f"   • File size: {size_mb:.2f} MB")
-            
-            print("\n💡 Dataset saved successfully!")
+                print(f"   - File size: {size_mb:.2f} MB")
+
+            if error_message:
+                print(f"   - Error: {error_message}")
+
+            emit_progress(final_status)
+
+            summary = self._build_progress_payload(final_status)
+            summary["error_message"] = error_message
+            return summary
 
 
 # ============================================================================
@@ -1134,10 +1243,9 @@ class UniversalGenerator:
 
 def main():
     """Main entry point for command-line usage."""
-    
-    # Allow configuration via command line arguments
+
     import argparse
-    
+
     parser = argparse.ArgumentParser(
         description="Universal Synthetic Dataset Generator",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1145,10 +1253,10 @@ def main():
 Examples:
   python universal_dataset_generator.py
   python universal_dataset_generator.py --prompt "Generate Q&A about Python programming" --size 500
-  python universal_dataset_generator.py --prompt "Customer support dialogues" --mode text --format json
+  python universal_dataset_generator.py --config job.json
         """
     )
-    
+
     parser.add_argument("--prompt", "-p", type=str, help="Generation prompt")
     parser.add_argument("--size", "-s", type=int, default=1000, help="Target dataset size")
     parser.add_argument("--mode", "-m", type=str, choices=["qa", "text", "json"], default="qa",
@@ -1157,37 +1265,110 @@ Examples:
                        help="Output file format")
     parser.add_argument("--output", "-o", type=str, default="generated_dataset",
                        help="Output filename (without extension)")
+    parser.add_argument("--checkpoint", type=str, default="generator_checkpoint.json",
+                       help="Checkpoint file path")
     parser.add_argument("--batch", "-b", type=int, default=10, help="Items per batch")
     parser.add_argument("--provider", type=str, choices=["huggingface", "openai", "mock"],
                        default="huggingface", help="Model provider")
     parser.add_argument("--model", type=str, help="Model name (for HuggingFace)")
     parser.add_argument("--fields", type=str, help="Comma-separated fields for JSON mode")
-    
+    parser.add_argument("--config", type=str, help="Path to JSON config file for non-interactive execution")
+    parser.add_argument("--auto-install", action="store_true", help="Enable runtime dependency installation")
+
     args = parser.parse_args()
-    
-    # Create config
-    config = GeneratorConfig(
-        target_size=args.size,
-        items_per_batch=args.batch,
-        output_file=args.output,
-        output_format=args.format,
-        provider=ModelProvider[args.provider.upper()] if args.provider else ModelProvider.HUGGINGFACE
+
+    config_json = {}
+    if args.config:
+        with open(args.config, "r", encoding="utf-8") as f:
+            parsed = json.load(f)
+            if not isinstance(parsed, dict):
+                raise ValueError("--config file must contain a JSON object")
+            config_json = parsed
+
+    provider_name = str(config_json.get("provider", args.provider)).lower()
+    try:
+        provider = ModelProvider[provider_name.upper()]
+    except KeyError:
+        raise ValueError(f"Unsupported provider in config: {provider_name}")
+
+    target_size = int(config_json.get("targetCount", config_json.get("size", args.size)))
+    items_per_batch = int(config_json.get("batchSize", config_json.get("batch", args.batch)))
+    output_format = str(config_json.get("outputFormat", config_json.get("format", args.format))).lower()
+
+    output_path = config_json.get("outputPath", config_json.get("output", args.output))
+    output_base = str(output_path)
+    output_root, output_ext = os.path.splitext(output_base)
+    if output_ext.lower() in [".jsonl", ".json", ".csv"]:
+        if "outputFormat" not in config_json and "format" not in config_json:
+            output_format = output_ext.lower().lstrip(".")
+        output_base = output_root
+
+    checkpoint_file = str(
+        config_json.get("checkpointPath", config_json.get("checkpointFile", args.checkpoint))
     )
-    
+
+    config = GeneratorConfig(
+        target_size=target_size,
+        items_per_batch=items_per_batch,
+        output_file=output_base,
+        output_format=output_format,
+        checkpoint_file=checkpoint_file,
+        provider=provider,
+    )
+
     if args.model:
         config.model_name = args.model
-    
-    # Parse extra fields
-    extra_fields = [f.strip() for f in args.fields.split(",")] if args.fields else None
-    
-    # Run generator
+    if config_json.get("model"):
+        config.model_name = str(config_json["model"])
+    if config_json.get("modelName"):
+        config.model_name = str(config_json["modelName"])
+    if config_json.get("openaiModel"):
+        config.openai_model = str(config_json["openaiModel"])
+    if config_json.get("saveInterval") is not None:
+        config.save_interval = max(1, int(config_json["saveInterval"]))
+    if config_json.get("autoSaveSeconds") is not None:
+        config.auto_save_seconds = max(1, int(config_json["autoSaveSeconds"]))
+
+    parse_mode = str(config_json.get("parseMode", args.mode)).lower()
+
+    prompt = config_json.get("prompt", args.prompt)
+    if not prompt:
+        domain_description = str(config_json.get("domainDescription", "")).strip()
+        topics = config_json.get("topics", [])
+        if isinstance(topics, list):
+            topic_values = [str(t).strip() for t in topics if str(t).strip()]
+        else:
+            topic_values = []
+
+        prompt_parts = []
+        if domain_description:
+            prompt_parts.append(domain_description)
+        if topic_values:
+            prompt_parts.append(f"Topics: {', '.join(topic_values)}")
+        prompt = "\n".join(prompt_parts).strip()
+
+    if args.fields:
+        extra_fields = [f.strip() for f in args.fields.split(",") if f.strip()]
+    elif isinstance(config_json.get("extraFields"), list):
+        extra_fields = [str(f).strip() for f in config_json["extraFields"] if str(f).strip()]
+    elif isinstance(config_json.get("fields"), list):
+        extra_fields = [str(f).strip() for f in config_json["fields"] if str(f).strip()]
+    else:
+        extra_fields = None
+
     generator = UniversalGenerator(config)
-    generator.run(
-        user_prompt=args.prompt,
-        parse_mode=args.mode,
-        extra_fields=extra_fields
+    result = generator.run(
+        user_prompt=prompt,
+        parse_mode=parse_mode,
+        extra_fields=extra_fields,
+        non_interactive=bool(args.config)
     )
+
+    if result.get("status") == "failed":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
     main()
+
+

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Briefcase, Heart, Scale, Cpu, FlaskConical, GraduationCap,
   ArrowRight, Search, Star, Download, Sparkles, Eye
@@ -9,9 +9,9 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Input from '../components/ui/Input';
 import { SkeletonTemplateCard } from '../components/ui/Skeleton';
-import { useToast } from '../components/ui/Toast';
 import Modal from '../components/ui/Modal';
 import { AnimatedSection } from '../hooks/useIntersectionObserver';
+import api from '../services/api';
 
 /**
  * Templates Page
@@ -35,6 +35,7 @@ import { AnimatedSection } from '../hooks/useIntersectionObserver';
  *   real error states and avoid silently diverging from server data.
  */
 const Templates = () => {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -54,8 +55,7 @@ const Templates = () => {
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const response = await fetch('/api/templates');
-        const data = await response.json();
+        const data = await api.getTemplates();
         setTemplates(data.templates);
         setIsLoading(false);
       } catch (error) {
@@ -350,9 +350,9 @@ const Templates = () => {
               variant="primary"
               className="flex-1"
               onClick={() => {
-                // Handle use template
+                if (!previewTemplate?.id) return;
                 setPreviewTemplate(null);
-                // would navigate to dashboard or generation
+                navigate(`/dashboard?template=${previewTemplate.id}`);
               }}
             >
               Use Template

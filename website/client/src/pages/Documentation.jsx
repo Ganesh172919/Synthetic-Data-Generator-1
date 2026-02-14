@@ -232,7 +232,7 @@ python Pre-Work/financial_education_generator_ultra.py`}
                 <CodeBlock
                   id="base-url"
                   language="text"
-                  code={`https://api.synthgen.ai/v1`}
+                  code={`/api  # local default (Vite proxies to http://localhost:3001 in dev)`}
                 />
 
                 <h2 className="text-2xl font-semibold mt-8 mb-4">Endpoints</h2>
@@ -261,8 +261,9 @@ python Pre-Work/financial_education_generator_ultra.py`}
                       language="json"
                       code={`{
   "jobId": "gen_abc123",
-  "status": "running",
-  "estimatedTime": "10 minutes"
+  "status": "queued",
+  "createdAt": "2026-02-14T00:00:00.000Z",
+  "config": { "...normalized config..." }
 }`}
                     />
                   </div>
@@ -300,10 +301,11 @@ python Pre-Work/financial_education_generator_ultra.py`}
                       id="job-res"
                       language="json"
                       code={`{
-  "jobId": "gen_abc123",
+  "id": "gen_abc123",
   "status": "completed",
-  "generated": 1000,
-  "downloadUrl": "/downloads/gen_abc123.jsonl"
+  "generatedCount": 1000,
+  "targetCount": 1000,
+  "outputFormat": "jsonl"
 }`}
                     />
                   </div>
@@ -488,8 +490,8 @@ df = pd.DataFrame(data)
 # Export to CSV
 df.to_csv('dataset.csv', index=False)
 
-# Export to Parquet (recommended for large datasets)
-df.to_parquet('dataset.parquet')`}
+# Export to JSON
+df.to_json('dataset.json', orient='records', indent=2)`}
                 />
               </div>
             )}

@@ -1,316 +1,92 @@
-# Security Summary
+# Security Baseline (Current Implementation)
 
-## Overview
+Last updated: 2026-02-14
 
-This document summarizes the security measures implemented in the Synthetic Data Generator platform and any remaining considerations for production deployment.
+This file documents what is actually implemented in the current API/worker stack.
 
-## Security Measures Implemented ✅
+## Implemented Controls
 
-### 1. Input Validation
+## 1) Input Validation
 
-#### API Parameters
-- **Domain**: Validated against whitelist of allowed domains
-- **Target Count**: Range validation (100-100,000)
-- **Batch Size**: Range validation (5-50)
-- **Output Format**: Whitelist validation (jsonl, csv, json)
-- **Temperature**: Range validation (0.0-2.0)
-- **Domain Description**: Length limit (max 1000 characters)
-- **Topics Array**: Element validation (non-empty strings, max 200 chars each)
-- **Model Name**: Whitelist validation (only approved models)
+`POST /api/generate` validates:
+- `domain` against allowlist:
+  - `financial|healthcare|legal|technology|science|education|custom`
+- `targetCount` within configured min/max
+- `batchSize` within configured min/max
+- `outputFormat` in `jsonl|csv|json`
+- `provider` in `mock|openai|huggingface`
+- `parseMode` in `qa|text|json`
 
-#### Request Parameters
-- **jobId**: Type and non-empty string validation
-- **templateId**: Type and non-empty string validation
-- **domainId**: Type and non-empty string validation
-- **filename**: Type validation and path traversal prevention
+Domain endpoints validate required fields for persistence.
 
-### 2. Path Traversal Prevention
+## 2) Rate Limiting
 
-**Download Endpoint (`/api/downloads/:jobId/:filename`)**:
-- Filename sanitization using `path.basename()`
-- Path traversal detection (`..` check)
-- Resolved path verification (must be within OUTPUTS_DIR)
-- Double-check with `path.resolve()` comparison
+Express rate limiting is enabled with separate buckets:
+- General `/api/*`
+- `POST /api/generate`
+- `GET /api/downloads/:jobId/:format`
 
-**Example Attack Prevented**:
-```bash
-# Attack attempt:
-GET /api/downloads/gen_12345/../../etc/passwd
+All limits are environment-configurable.
 
-# Result: 400 Bad Request - "Invalid filename"
-```
+## 3) Optional API-Key Auth
 
-### 3. Rate Limiting
+Auth modes:
+- `AUTH_MODE=none`
+- `AUTH_MODE=api_key`
 
-**General API Rate Limit**:
-- Window: 15 minutes
-- Max: 100 requests per IP
-- Applied to: All `/api/*` routes
+When API-key mode is enabled:
+- Accepts `x-api-key` or `Authorization: Bearer <key>`
+- Keys come from `API_KEYS` (comma-separated)
+- Localhost requests are allowed without a key (for local dev)
 
-**Generation Endpoint**:
-- Window: 1 hour
-- Max: 10 generation jobs per IP
-- Applied to: `POST /api/generate`
+## 4) Request Size Limits
 
-**Download Endpoint**:
-- Window: 15 minutes
-- Max: 50 downloads per IP
-- Applied to: `GET /api/downloads/:jobId/:filename`
+JSON body parser limit is configured via:
+- `MAX_BODY_SIZE` (default `50kb`)
 
-### 4. Resource Management
+## 5) Safe Artifact Downloads
 
-**Log Management**:
-- Maximum 100 log entries per job
-- Circular buffer implementation
-- Prevents unbounded memory growth
+`GET /api/downloads/:jobId/:format`:
+- Whitelists format (`jsonl|csv|json`)
+- Resolves output path from known job metadata
+- Verifies resolved paths remain inside `OUTPUTS_DIR`
+- Streams files from disk (no in-memory synthetic payloads)
 
-**Process Management**:
-- Graceful shutdown handlers (SIGTERM, SIGINT)
-- Process cleanup on server shutdown
-- Active process tracking
+## 6) Durable Audit Trail
 
-### 5. Error Handling
+SQLite tables:
+- `jobs`
+- `job_events`
+- `domains`
 
-**Secure Error Messages**:
-- Generic error messages to clients
-- Detailed errors logged server-side only
-- Stack traces never exposed to clients
+Job progress/status changes are persisted and exposed via SSE.
 
-**File Access**:
-- Try-catch blocks around all file operations
-- Proper error status codes (404 for not found, 400 for invalid, 500 for server errors)
+## 7) Structured Logging + Request IDs
 
-### 6. Data Sanitization
+API uses:
+- `pino`
+- `pino-http`
 
-**JSON Parsing**:
-- Try-catch around all JSON.parse operations
-- Validation of parsed data structure
+Request IDs are generated (or propagated from `x-request-id`).
 
-**Subprocess Execution**:
-- Config passed via file, not command-line arguments
-- No shell interpolation vulnerabilities
-- Process stdio properly handled
+## 8) Retention Cleanup
 
-## CodeQL Security Analysis Results
+Old terminal jobs (`completed|failed|stopped`) are pruned based on:
+- `JOB_RETENTION_DAYS` (default `7`)
 
-**Scan Date**: 2026-01-29
+Cleanup removes DB rows and artifact directories.
 
-**Languages Analyzed**: Python, JavaScript
+## Remaining Gaps / Next Hardening Steps
 
-**Results**:
-- **Python**: ✅ No alerts found
-- **JavaScript**: ⚠️ 2 alerts (addressed)
+- No user accounts or RBAC yet (API-key mode is coarse-grained)
+- No TLS termination in-repo (expected at ingress/proxy layer)
+- No centralized SIEM integration
+- No automated secret scanning in runtime path
+- No immutable object storage for artifacts yet
 
-### Alerts Addressed
+## Reporting
 
-1. **js/missing-rate-limiting** (POST /api/generate)
-   - Status: ✅ Fixed
-   - Solution: Added `generationLimiter` middleware
-
-2. **js/missing-rate-limiting** (GET /api/downloads)
-   - Status: ✅ Fixed
-   - Solution: Added `downloadLimiter` middleware
-
-## Remaining Considerations for Production 🔐
-
-### 1. Authentication & Authorization
-
-**Current State**: None (MVP)
-
-**Recommended**:
-- JWT-based authentication
-- User accounts with API keys
-- Role-based access control (RBAC)
-- Per-user job limits
-
-**Implementation**:
-```javascript
-const jwt = require('jsonwebtoken');
-const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  // Verify token and attach user to req.user
-  next();
-};
-```
-
-### 2. Data Encryption
-
-**Current State**: Data at rest not encrypted
-
-**Recommended**:
-- Encrypt generated datasets at rest
-- HTTPS/TLS for all communications
-- Secure environment variable storage
-
-### 3. Database Security
-
-**Current State**: In-memory storage only
-
-**Recommended**:
-- Use parameterized queries (prevent SQL injection)
-- Encrypt sensitive data in database
-- Regular backups
-- Database access logging
-
-### 4. Advanced Rate Limiting
-
-**Current State**: Basic IP-based rate limiting
-
-**Recommended**:
-- Redis-based distributed rate limiting
-- Per-user rate limits (when auth implemented)
-- Adaptive rate limiting based on load
-- DDoS protection (e.g., Cloudflare)
-
-### 5. Logging & Monitoring
-
-**Current State**: Console logging only
-
-**Recommended**:
-- Structured logging (Winston, Bunyan)
-- Log aggregation (ELK stack, Datadog)
-- Security event monitoring
-- Alerting on suspicious activity
-
-### 6. Dependency Security
-
-**Current State**: Manual dependency management
-
-**Recommended**:
-- Regular `npm audit` runs
-- Automated dependency updates (Dependabot)
-- Vulnerability scanning in CI/CD
-- Lock file integrity checks
-
-### 7. Container Security
-
-**Current State**: No containerization
-
-**Recommended**:
-- Minimal base images (Alpine)
-- Non-root user in containers
-- Security scanning (Trivy, Snyk)
-- Resource limits
-
-### 8. API Security
-
-**Additional Recommendations**:
-- API versioning (`/api/v1/`)
-- Request ID tracking
-- CORS configuration review
-- Input size limits
-- GraphQL query complexity limits (if applicable)
-
-## Security Best Practices Followed ✅
-
-1. **Principle of Least Privilege**: Processes run with minimal permissions
-2. **Defense in Depth**: Multiple layers of validation
-3. **Fail Securely**: Errors default to deny access
-4. **Secure Defaults**: Conservative default configurations
-5. **Keep It Simple**: Minimal complexity in security-critical code
-6. **Open Design**: Security through well-reviewed design, not obscurity
-
-## Compliance Considerations
-
-### GDPR (if applicable)
-- User data minimization
-- Right to deletion
-- Data portability
-- Consent management
-
-### SOC 2 (if applicable)
-- Access controls
-- Encryption
-- Audit logging
-- Incident response
-
-## Security Testing Checklist
-
-- [x] Input validation testing
-- [x] Path traversal testing
-- [x] Rate limiting verification
-- [x] Error handling review
-- [x] CodeQL security scanning
-- [ ] Penetration testing (recommend for production)
-- [ ] Dependency vulnerability scanning
-- [ ] Security audit by third party (recommend for production)
-
-## Incident Response Plan
-
-**Recommended for Production**:
-
-1. **Detection**: Monitoring and alerting
-2. **Containment**: Isolate affected systems
-3. **Eradication**: Remove vulnerability
-4. **Recovery**: Restore normal operations
-5. **Lessons Learned**: Post-incident review
-
-## Contact
-
-For security concerns or vulnerability reports:
-- Create a GitHub Security Advisory
-- Email: [security contact if available]
-
-## Last Updated
-
-2026-01-29
-
----
-
-**Note**: This is a development/MVP implementation. For production deployment, implement the recommendations in the "Remaining Considerations" section above.
-
-## Educational Notes (Added)
-
-### What this file is for
-
-`SECURITY.md` documents security measures, checks, and recommendations. It serves two audiences:
-
-1. **Developers** who want to harden the platform for production
-2. **Reviewers** who want to understand the current risk surface and gaps
-
-### Reality-aligned updates (paths, current behavior)
-
-The most important “source of truth” for what is implemented today is:
-
-- `website/server/index.js` — Express demo API
-
-Reality check (implemented vs documented):
-
-| Topic | What this document says | What exists in `website/server/index.js` today |
-| --- | --- | --- |
-| Input validation | Extensive validation | Basic validation for a few fields (domain/count/batch/format) |
-| Rate limiting | Mentioned as implemented/fixed | Not implemented in the demo server code |
-| Path traversal prevention | Detailed prevention notes | Download endpoint serves generated mock payload; no filesystem path handling |
-| AuthN/AuthZ | Recommended | Not implemented |
-| Persistence | Discussed | Jobs/domains stored in memory (lost on restart) |
-
-If you want to align implementation with the stronger posture described above, treat this file as a roadmap rather than a guarantee.
-
-### Synthetic data safety (content risks)
-
-Security isn’t only about servers and endpoints. With synthetic data generation, “security” also includes **output safety**:
-
-- **PII leakage**: prompts can produce personal data even when you didn’t intend it.
-- **Harmful advice**: finance/medical/legal content can be wrong but appear confident.
-- **Bias and stereotypes**: synthetic text can amplify bias depending on prompts and sampling.
-- **Data provenance**: without metadata, you can’t audit how a dataset was produced.
-
-Practical mitigations:
-
-1. Add output filters (PII patterns, unsafe advice phrases).
-2. Keep `metadata` fields (prompt, provider/model, parameters, timestamp).
-3. Sample and review outputs manually before training or sharing.
-
-See `docs/SECURITY_AND_SAFETY.md` for an extended threat model and safety checklist.
-
-### Edge cases & failure modes
-
-- “Secure in docs, insecure in code”: happens when security docs outpace MVP implementation.
-- “Local demo becomes internet-exposed”: binding a dev server to `0.0.0.0` changes the threat model.
-- “Large payloads”: datasets can be huge; add input size limits and streaming downloads for production.
-
-### Next steps / exercises
-
-1. Read `website/server/index.js` and list every endpoint + the validations it actually performs.
-2. Add a small “security acceptance checklist” you can run before deploying (auth, rate limit, persistence, logs).
+If you find a vulnerability, open a private security advisory or issue with:
+- reproduction steps
+- expected vs actual behavior
+- impact scope

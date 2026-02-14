@@ -45,7 +45,6 @@ const DomainBuilder = () => {
     }
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [savedMessage, setSavedMessage] = useState('');
 
   const questionTypeOptions = [
     { value: 'definition', label: 'Definition', description: 'What is X?' },
@@ -153,11 +152,11 @@ const DomainBuilder = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await api.saveDomain(domainConfig);
+      const response = await api.saveDomain(domainConfig);
       toast.success('Domain saved successfully!');
       
       // Navigate to dashboard or show success state
-      setTimeout(() => navigate('/dashboard'), 1500);
+      setTimeout(() => navigate('/dashboard', { state: { domainId: response.id } }), 800);
     } catch (error) {
       console.error('Failed to save domain:', error);
       toast.error('Failed to save domain');

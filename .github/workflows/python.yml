@@ -1,0 +1,49 @@
+name: Python CI
+
+on:
+  push:
+    paths:
+      - "worker/**"
+      - "Pre-Work/**"
+      - ".github/workflows/python.yml"
+  pull_request:
+    paths:
+      - "worker/**"
+      - "Pre-Work/**"
+      - ".github/workflows/python.yml"
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lightweight deps for mock provider
+        run: pip install tqdm openai
+
+      - name: Compile checks
+        run: python -m py_compile worker/main.py Pre-Work/universal_dataset_generator.py
+
+      - name: Mock generator smoke
+        run: |
+          cat > /tmp/synthgen-job.json <<'EOF'
+          {
+            "prompt": "Generate simple software engineering Q&A pairs.",
+            "provider": "mock",
+            "parseMode": "qa",
+            "targetCount": 100,
+            "batchSize": 10,
+            "outputFormat": "jsonl",
+            "outputPath": "/tmp/synthgen-dataset.jsonl",
+            "checkpointPath": "/tmp/synthgen-checkpoint.json",
+            "autoSaveSeconds": 2,
+            "saveInterval": 10
+          }
+          EOF
+          python Pre-Work/universal_dataset_generator.py --config /tmp/synthgen-job.json

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Backend API server for Synthetic Data Generator",
   "_educational_notes": {
-    "purpose": "Demo Express API used by the React UI in website/client (jobs are in-memory; progress is simulated).",
+    "purpose": "Production-like Express API with durable SQLite jobs/events consumed by website/client and worker/main.py.",
     "how_to_run": [
       "cd website/server",
       "npm install",
@@ -19,7 +19,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "keywords": [
     "synthetic-data",
@@ -29,8 +29,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.2.1",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "uuid": "^9.0.1"
   }
 }

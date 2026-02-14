@@ -1,105 +1,63 @@
-# Quick Start Guide - Universal Synthetic Dataset Generator
+# Quick Start (Durable API + Worker)
 
-## 🎯 What This Platform Does
+This project now runs as a two-service backend:
+- `website/server` (Node/Express API + SQLite metadata)
+- `worker/main.py` (Python job worker + real artifact generation)
 
-Generate high-quality synthetic datasets for ANY domain using Mistral AI, with:
-- **Web Interface**: Beautiful React dashboard
-- **API**: RESTful backend for automation
-- **Zero Cost**: Runs on free Google Colab or local GPU
-- **Fast**: Up to 100+ items/minute on T4 GPU
-- **Secure**: Rate-limited, validated, production-ready
+The frontend remains at `website/client`.
 
-## 📋 3-Minute Setup
+## 1) Prerequisites
 
-### Step 1: Install Dependencies
+- Node.js 20+
+- Python 3.10+
+- npm
+
+Optional:
+- Docker + Docker Compose
+
+## 2) Install Dependencies
 
 ```bash
-# Backend dependencies
-cd server
+# API
+cd website/server
 npm install
 
-# Frontend dependencies
-cd ../website/client
+# Frontend
+cd ../client
 npm install
 
-# Python dependencies
-cd ../../Pre-Work
-pip install transformers accelerate bitsandbytes torch tqdm
+# Worker runtime deps (optional for mock-only local runs)
+cd ../../
+pip install -r worker/requirements.txt
 ```
 
-### Step 2: Start the Platform
+## 3) Run Locally (3 Terminals)
 
-**Terminal 1 - Backend Server:**
+Terminal A (API):
 ```bash
-cd server
+cd website/server
 npm start
 ```
 
-**Terminal 2 - Frontend:**
+Terminal B (Worker):
+```bash
+cd worker
+python main.py
+```
+
+Terminal C (Client):
 ```bash
 cd website/client
 npm run dev
 ```
 
-**Terminal 3 - Test (Optional):**
-```bash
-cd server
-npm test
-```
+Open:
+- UI: `http://localhost:5173`
+- API: `http://localhost:3001/api`
 
-### Step 3: Open Browser
+## 4) Minimal API Flow
 
-Navigate to: **http://localhost:5173**
-
-## 🎨 Using the Web Interface
-
-### Option 1: Quick Start with Templates
-
-1. Click **"Templates"** in navigation
-2. Browse 6 pre-configured templates:
-   - Financial Education
-   - Healthcare/Clinical
-   - Legal Documents
-   - Programming Q&A
-   - Scientific Research
-   - Educational Tutoring
-3. Click **"Use Template"** on any template
-4. Adjust settings (size, batch, format)
-5. Click **"Start Generation"**
-6. Monitor real-time progress
-7. Download when complete
-
-### Option 2: Custom Domain Builder
-
-1. Click **"Domain Builder"** in navigation
-2. Fill in the form:
-   - **Domain Name**: e.g., "Machine Learning Tutorials"
-   - **Description**: Brief description of content
-   - **Topics**: Add topics (Python, PyTorch, Training, etc.)
-   - **Output Format**: JSONL, CSV, or JSON
-3. Click **"Save Domain"**
-4. Use saved domain in generation
-
-### Option 3: Dashboard (Quick Generation)
-
-1. Go to **"Dashboard"**
-2. Configure generation:
-   - **Domain**: Select from dropdown
-   - **Target Size**: 100 - 100,000 items
-   - **Batch Size**: 5 - 50 items per batch
-   - **Format**: JSONL, CSV, or JSON
-3. Click **"Start Generation"**
-4. View live progress:
-   - Items generated
-   - Generation rate
-   - Time remaining
-   - Progress percentage
-5. Click **"Download"** when complete
-
-## 🔌 Using the API
-
-### Start Generation
-
+Start a job:
 ```bash
 curl -X POST http://localhost:3001/api/generate \
   -H "Content-Type: application/json" \
@@ -108,304 +66,35 @@ curl -X POST http://localhost:3001/api/generate \
     "targetCount": 1000,
     "batchSize": 25,
     "outputFormat": "jsonl",
-    "domainDescription": "Python programming tutorials and examples",
-    "topics": ["Functions", "Classes", "Decorators", "Async/Await"]
+    "provider": "mock",
+    "parseMode": "qa"
   }'
 ```
 
-Response:
-```json
-{
-  "jobId": "gen_a1b2c3d4",
-  "status": "initializing",
-  "message": "Generation job started"
-}
-```
-
-### Check Job Status
-
-```bash
-curl http://localhost:3001/api/jobs/gen_a1b2c3d4
-```
-
-Response:
-```json
-{
-  "id": "gen_a1b2c3d4",
-  "status": "running",
-  "generated": 450,
-  "targetCount": 1000,
-  "progress": 45.0,
-  "rate": 12.5,
-  "estimatedTimeRemaining": 44
-}
-```
-
-### Download Dataset
-
-```bash
-curl -O http://localhost:3001/api/downloads/gen_a1b2c3d4/dataset_gen_a1b2c3d4.jsonl
-```
-
-### List All Jobs
-
-```bash
-curl http://localhost:3001/api/jobs
-```
-
-### Stop a Job
-
-```bash
-curl -X POST http://localhost:3001/api/jobs/gen_a1b2c3d4/stop
-```
-
-## 📊 Example: Generate 5,000 Q&A Dataset
-
-**Goal**: Create a dataset of 5,000 Q&A pairs about web development
-
-**Method 1: Web Interface**
-
-1. Open http://localhost:5173
-2. Go to Dashboard
-3. Set:
-   - Domain: Technology
-   - Target: 5000
-   - Batch: 25
-   - Description: "Web development Q&A covering HTML, CSS, JavaScript, React"
-   - Topics: ["HTML Basics", "CSS Flexbox", "JavaScript ES6", "React Hooks"]
-4. Click "Start Generation"
-5. Wait ~40-50 minutes (on T4 GPU at ~100 items/min)
-6. Download JSONL file
-
-**Method 2: API**
-
-```bash
-curl -X POST http://localhost:3001/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "domain": "technology",
-    "targetCount": 5000,
-    "batchSize": 25,
-    "outputFormat": "jsonl",
-    "domainDescription": "Web development Q&A covering HTML, CSS, JavaScript, React",
-    "topics": [
-      "HTML Basics",
-      "CSS Flexbox and Grid",
-      "JavaScript ES6 Features",
-      "React Hooks and Components",
-      "RESTful API Design"
-    ]
-  }'
-```
-
-## 🎯 Output Format Examples
-
-### JSONL (Default - Recommended)
-
-Each line is a JSON object:
-```json
-{"id":"item_abc123_1234","question":"What is a React Hook?","answer":"React Hooks are functions that let you use state and other React features without writing a class...","metadata":{"source_prompt":"Web development Q&A","parse_mode":"qa"},"created_at":"2026-01-29T00:00:00.000000"}
-{"id":"item_def456_5678","question":"What is CSS Flexbox?","answer":"Flexbox is a CSS layout module that makes it easier to design flexible responsive layout structures...","metadata":{"source_prompt":"Web development Q&A","parse_mode":"qa"},"created_at":"2026-01-29T00:00:01.000000"}
-```
-
-**Use for**: ML training, LLM fine-tuning, database imports
-
-### CSV
-
-```csv
-id,question,answer,created_at
-item_abc123_1234,"What is a React Hook?","React Hooks are functions...",2026-01-29T00:00:00
-item_def456_5678,"What is CSS Flexbox?","Flexbox is a CSS layout...",2026-01-29T00:00:01
-```
-
-**Use for**: Excel, data analysis, spreadsheets
-
-### JSON
-
-```json
-[
-  {
-    "id": "item_abc123_1234",
-    "question": "What is a React Hook?",
-    "answer": "React Hooks are functions...",
-    "created_at": "2026-01-29T00:00:00"
-  },
-  {
-    "id": "item_def456_5678",
-    "question": "What is CSS Flexbox?",
-    "answer": "Flexbox is a CSS layout...",
-    "created_at": "2026-01-29T00:00:01"
-  }
-]
-```
-
-**Use for**: Web apps, APIs, single-file processing
-
-## ⚙️ Configuration Options
-
-### Generation Parameters
-
-| Parameter | Range | Default | Description |
-|-----------|-------|---------|-------------|
-| `targetCount` | 100-100,000 | 1000 | Number of items to generate |
-| `batchSize` | 5-50 | 25 | Items per LLM call (higher = faster) |
-| `temperature` | 0.0-2.0 | 0.8 | Model creativity (lower = factual) |
-| `outputFormat` | jsonl/csv/json | jsonl | Output file format |
-
-### Supported Models
-
-- `mistralai/Mistral-7B-Instruct-v0.2` (Default, recommended)
-- `microsoft/phi-2`
-- `google/gemma-2b`
-
-### Performance Expectations
-
-| Hardware | Rate | 1k Dataset | 10k Dataset |
-|----------|------|------------|-------------|
-| T4 GPU (Free Colab) | ~100/min | ~10 min | ~1.7 hours |
-| RTX 3090/4090 | ~150/min | ~7 min | ~1.1 hours |
-| A100 GPU | ~200/min | ~5 min | ~50 min |
-
-## 🐛 Troubleshooting
-
-### "Python not available"
-
-```bash
-# Install Python 3.8+
-# Set PYTHON_PATH environment variable
-export PYTHON_PATH=/usr/bin/python3
-```
-
-### "Port already in use"
-
-```bash
-# Kill existing process
-lsof -i :3001
-kill -9 <PID>
-
-# Or use different port
-PORT=3002 npm start
-```
-
-### "Out of memory" during generation
-
-**Solution**: Reduce batch size
-```json
-{
-  "batchSize": 10  // Instead of 25
-}
-```
-
-### Generation is slow
-
-**Check**:
-1. GPU is enabled: `nvidia-smi` (should show GPU)
-2. Quantization is on: `"useQuantization": true`
-3. Using appropriate batch size
-
-## 📚 Additional Resources
-
-- **Setup Guide**: See [SETUP.md](SETUP.md)
-- **Security**: See [SECURITY.md](SECURITY.md)
-- **Backend API**: See [server/README.md](server/README.md)
-- **Main README**: See [Readme.md](Readme.md)
-
-## 🎉 You're Ready!
-
-Start generating synthetic datasets for:
-- 🎓 Training AI models
-- 📊 Data augmentation
-- 🧪 Testing and validation
-- 🔬 Research and experimentation
-- 💼 Demos and prototypes
-
-**Happy Dataset Generating!** 🚀
-
-## Educational Notes (Added)
-
-### What this file is for
-
-This quick start is meant to get you from “clone” to “running” as fast as possible. It covers:
-
-- starting the web UI and backend API
-- basic API usage with `curl`
-- common setup failures and quick fixes
-
-### Reality-aligned updates (paths, current behavior)
-
-Several commands in this document reference a top-level `server/` directory. In this repository layout, the backend is located at:
-
-- `website/server` (Express API server)
-- `website/client` (React + Vite frontend)
-
-There is **no** top-level `server/` directory.
-
-#### Correct folder commands (local dev)
-
-```bash
-# Backend
-cd website/server
-npm install
-npm start
-
-# Frontend (new terminal)
-cd website/client
-npm install
-npm run dev
-```
-
-### Real-world examples
-
-#### Example 1: Start a job (matches current demo API)
-
-```bash
-curl -X POST http://localhost:3001/api/generate ^
-  -H "Content-Type: application/json" ^
-  -d "{\"domain\":\"technology\",\"targetCount\":500,\"batchSize\":25,\"outputFormat\":\"jsonl\"}"
-```
-
-Notes:
-- On PowerShell, prefer single quotes for JSON and double quotes inside if needed.
-- On Windows `cmd.exe`, line continuation is `^` (shown above). In PowerShell, use backticks `` ` `` or put the command on one line.
-
-#### Example 2: Poll job status
-
+Check status:
 ```bash
 curl http://localhost:3001/api/jobs/<jobId>
 ```
 
-#### Example 3: Download output (demo payload)
-
-The demo server expects:
-
+Download artifact:
 ```bash
-curl http://localhost:3001/api/downloads/<jobId>/jsonl
-curl http://localhost:3001/api/downloads/<jobId>/csv
-curl http://localhost:3001/api/downloads/<jobId>/json
+curl -O http://localhost:3001/api/downloads/<jobId>/jsonl
 ```
 
-### Edge cases & failure modes
+## 5) Docker Compose (Production-like Local Stack)
 
-- **Download before completion**: the server returns an error if a job is not `completed`.
-- **In-memory jobs**: restarting the API server loses job history and custom domains.
-- **`parquet` is a placeholder**: the job config accepts `parquet`, but the demo download endpoint does not produce real parquet output yet.
-- **UI “demo mode”**: if the UI can’t reach the API, some pages fall back to simulated behavior.
+```bash
+docker compose up --build
+```
 
-### Troubleshooting
+Shared data is persisted under:
+- `website/server/data/synthgen.sqlite`
+- `website/server/data/outputs/<jobId>/...`
 
-- API not responding: visit `http://localhost:3001/api/health`
-- UI not responding: visit `http://localhost:5173`
-- Wrong working directory: run `npm install` inside `website/server` and `website/client` (not the repo root).
+## 6) Supported Output Formats
 
-### Learning notes
+- `jsonl`
+- `csv`
+- `json`
 
-- The web platform is split into two independent Node projects:
-  - `website/server` (Express)
-  - `website/client` (Vite)
-- Vite’s dev server proxies `/api` calls to the Express server to avoid CORS problems in dev.
-
-### Next steps / exercises
-
-1. Read `docs/WEB_PLATFORM.md` and trace each endpoint in `website/server/index.js`.
-2. Run `Pre-Work/universal_dataset_generator.py` to generate a “real” dataset file outside the web UI.
-3. Compare the demo server’s mock output fields to the schema documented in `docs/DATASET_SCHEMA.md`.
+`parquet` is intentionally not exposed in this cycle.
