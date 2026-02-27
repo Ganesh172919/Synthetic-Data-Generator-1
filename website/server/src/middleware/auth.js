@@ -53,11 +53,8 @@ const createAuthMiddleware = ({ jwtSecret, apiKeyService, legacyApiKeys = [], au
       return next();
     }
 
-    if (authMode === 'none') {
-      req.user = null;
-      return next();
-    }
-
+    // Always attempt to extract credentials (even in 'none' mode)
+    // so that authenticated features work when tokens are provided.
     const bearerToken = extractBearerToken(req);
     if (bearerToken && jwtSecret) {
       const payload = verifyJwt(bearerToken, jwtSecret);
@@ -101,6 +98,12 @@ const createAuthMiddleware = ({ jwtSecret, apiKeyService, legacyApiKeys = [], au
 
     if (apiKey && legacyApiKeys.includes(apiKey)) {
       req.user = { id: 'legacy', role: 'admin', tier: 'enterprise', authMethod: 'legacy_key' };
+      return next();
+    }
+
+    // If auth mode is 'none', allow unauthenticated access
+    if (authMode === 'none') {
+      req.user = null;
       return next();
     }
 

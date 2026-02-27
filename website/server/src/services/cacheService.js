@@ -25,6 +25,9 @@ class CacheService {
     this.misses = 0;
 
     this._cleanupInterval = setInterval(() => this.evictExpired(), 30000);
+    if (this._cleanupInterval.unref) {
+      this._cleanupInterval.unref();
+    }
   }
 
   get(key) {
