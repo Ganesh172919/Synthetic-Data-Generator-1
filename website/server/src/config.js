@@ -60,6 +60,15 @@ const config = {
   sseHeartbeatMs: parseIntEnv('SSE_HEARTBEAT_MS', 15000, 1000),
 
   defaultProvider: (process.env.DEFAULT_PROVIDER || 'mock').toLowerCase(),
+
+  // --- SaaS platform settings ---
+  jwtSecret: process.env.JWT_SECRET || 'synthgen-dev-secret-change-in-production',
+  jwtExpiresIn: parseIntEnv('JWT_EXPIRES_IN', 86400, 300),
+
+  enableSaaS: (process.env.ENABLE_SAAS || 'true').toLowerCase() === 'true',
+  enableUsageTracking: (process.env.ENABLE_USAGE_TRACKING || 'true').toLowerCase() === 'true',
+
+  usageRetentionDays: parseIntEnv('USAGE_RETENTION_DAYS', 90, 1),
 };
 
 module.exports = {

@@ -19,7 +19,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
-    "test": "node --test"
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "synthetic-data",

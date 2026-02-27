@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Zap, Database, Sun, Moon } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Zap, Database, Sun, Moon, User, LogOut, Settings } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth';
 
 /**
  * Navbar Component
@@ -24,7 +25,9 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
+  const { isAuthenticated, logout } = useAuth();
 
   // Close mobile menu on route change
   const pathname = location.pathname;
@@ -48,6 +51,7 @@ const Navbar = () => {
     { path: '/templates', label: 'Templates' },
     { path: '/domain-builder', label: 'Domain Builder' },
     { path: '/documentation', label: 'Docs' },
+    { path: '/pricing', label: 'Pricing' },
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -128,23 +132,78 @@ const Navbar = () => {
               </div>
             </button>
             
-            {/* CTA Button */}
-            <Link
-              to="/dashboard"
-              className="
-                flex items-center space-x-2 px-5 py-2.5
-                bg-gradient-to-r from-purple-500 to-pink-500
-                rounded-xl font-medium text-sm text-white
-                shadow-lg shadow-purple-500/25
-                hover:shadow-xl hover:shadow-purple-500/30
-                hover:-translate-y-0.5
-                active:translate-y-0
-                transition-all duration-200
-              "
-            >
-              <Zap className="w-4 h-4" />
-              <span>Start Generating</span>
-            </Link>
+            {/* CTA / Auth Button */}
+            {isAuthenticated ? (
+              <div className="flex items-center space-x-2">
+                <Link
+                  to="/settings"
+                  className={`p-2.5 rounded-xl transition-all duration-200 ${
+                    isDark
+                      ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  aria-label="Settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </Link>
+                <button
+                  onClick={() => { logout(); navigate('/'); }}
+                  className={`p-2.5 rounded-xl transition-all duration-200 ${
+                    isDark
+                      ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  aria-label="Sign out"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+                <Link
+                  to="/dashboard"
+                  className="
+                    flex items-center space-x-2 px-5 py-2.5
+                    bg-gradient-to-r from-purple-500 to-pink-500
+                    rounded-xl font-medium text-sm text-white
+                    shadow-lg shadow-purple-500/25
+                    hover:shadow-xl hover:shadow-purple-500/30
+                    hover:-translate-y-0.5
+                    active:translate-y-0
+                    transition-all duration-200
+                  "
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link
+                  to="/auth"
+                  className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                    isDark
+                      ? 'text-gray-300 hover:text-white hover:bg-white/5'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/dashboard"
+                  className="
+                    flex items-center space-x-2 px-5 py-2.5
+                    bg-gradient-to-r from-purple-500 to-pink-500
+                    rounded-xl font-medium text-sm text-white
+                    shadow-lg shadow-purple-500/25
+                    hover:shadow-xl hover:shadow-purple-500/30
+                    hover:-translate-y-0.5
+                    active:translate-y-0
+                    transition-all duration-200
+                  "
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>Start Generating</span>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Mobile menu button */}
