@@ -66,6 +66,15 @@ const config = Object.freeze({
 
   defaultProvider: (process.env.DEFAULT_PROVIDER || 'mock').toLowerCase(),
   maxConcurrentJobs: parseIntEnv('MAX_CONCURRENT_JOBS', 1, 1, 16),
+
+  // --- SaaS platform settings ---
+  jwtSecret: process.env.JWT_SECRET || 'synthgen-dev-secret-change-in-production',
+  jwtExpiresIn: parseIntEnv('JWT_EXPIRES_IN', 86400, 300),
+
+  enableSaaS: (process.env.ENABLE_SAAS || 'true').toLowerCase() === 'true',
+  enableUsageTracking: (process.env.ENABLE_USAGE_TRACKING || 'true').toLowerCase() === 'true',
+
+  usageRetentionDays: parseIntEnv('USAGE_RETENTION_DAYS', 90, 1),
 });
 
 module.exports = {

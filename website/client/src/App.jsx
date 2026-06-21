@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './hooks/useTheme';
+import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './components/ui/Toast';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -9,6 +10,9 @@ import Templates from './pages/Templates';
 import DomainBuilder from './pages/DomainBuilder';
 import ProviderSettings from './pages/ProviderSettings';
 import Documentation from './pages/Documentation';
+import AuthPage from './pages/AuthPage';
+import PricingPage from './pages/PricingPage';
+import SettingsPage from './pages/SettingsPage';
 import NotFound from './pages/NotFound';
 
 /**
@@ -63,6 +67,9 @@ function AppContent() {
             <Route path="/domain-builder" element={<DomainBuilder />} />
             <Route path="/providers" element={<ProviderSettings />} />
             <Route path="/documentation" element={<Documentation />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
@@ -88,7 +95,9 @@ function App() {
     <ThemeProvider>
       <ToastProvider>
         <Router>
-          <AppContent />
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
         </Router>
       </ToastProvider>
     </ThemeProvider>
