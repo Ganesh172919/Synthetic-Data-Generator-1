@@ -1,57 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
-
-const schemaSql = `
-CREATE TABLE IF NOT EXISTS jobs (
-  id TEXT PRIMARY KEY,
-  status TEXT NOT NULL,
-  domain TEXT NOT NULL,
-  config_json TEXT NOT NULL,
-  prompt TEXT,
-  provider TEXT NOT NULL,
-  parse_mode TEXT NOT NULL,
-  output_format TEXT NOT NULL,
-  target_count INTEGER NOT NULL,
-  batch_size INTEGER NOT NULL,
-  generated_count INTEGER NOT NULL DEFAULT 0,
-  duplicates_count INTEGER NOT NULL DEFAULT 0,
-  invalid_count INTEGER NOT NULL DEFAULT 0,
-  rate_items_per_sec REAL NOT NULL DEFAULT 0,
-  eta_seconds INTEGER,
-  stop_requested INTEGER NOT NULL DEFAULT 0,
-  error_message TEXT,
-  output_dir TEXT NOT NULL,
-  output_file TEXT,
-  checkpoint_file TEXT,
-  created_at TEXT NOT NULL,
-  started_at TEXT,
-  completed_at TEXT,
-  updated_at TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
-CREATE INDEX IF NOT EXISTS idx_jobs_updated_at ON jobs(updated_at);
-
-CREATE TABLE IF NOT EXISTS job_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  job_id TEXT NOT NULL,
-  ts INTEGER NOT NULL,
-  type TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_job_events_job_id_id ON job_events(job_id, id);
-
-CREATE TABLE IF NOT EXISTS domains (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  config_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-`;
+const { runMigrations } = require('./migrations');
 
 const initDatabase = (config) => {
   fs.mkdirSync(config.dataDir, { recursive: true });
@@ -62,7 +12,12 @@ const initDatabase = (config) => {
   db.pragma('synchronous = NORMAL');
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
-  db.exec(schemaSql);
+
+  const result = runMigrations(db);
+  if (result.applied > 0) {
+    const logger = require('pino')({ level: config.logLevel || 'info' });
+    logger.info({ applied: result.applied, current: result.current }, 'Database migrations applied');
+  }
 
   return db;
 };
@@ -112,6 +67,8 @@ const toApiJob = (row) => {
     outputDir: row.output_dir,
     outputFile: row.output_file || null,
     checkpointFile: row.checkpoint_file || null,
+    language: row.language || 'en',
+    retryCount: Number(row.retry_count || 0),
     createdAt: row.created_at,
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -131,7 +88,7 @@ const toApiDomain = (row) => {
     name: row.name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    ...cfg,
+    config: cfg,
   };
 };
 

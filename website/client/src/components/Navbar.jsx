@@ -47,6 +47,7 @@ const Navbar = () => {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/templates', label: 'Templates' },
     { path: '/domain-builder', label: 'Domain Builder' },
+    { path: '/providers', label: 'Providers' },
     { path: '/documentation', label: 'Docs' },
   ];
 

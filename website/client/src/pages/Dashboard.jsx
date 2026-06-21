@@ -66,11 +66,48 @@ const Dashboard = () => {
     outputFormat: 'jsonl',
     provider: 'mock',
     parseMode: 'qa',
+    language: 'en',
+    modelName: '',
     prompt: '',
     domainId: '',
     domainDescription: '',
     topicsInput: '',
   });
+
+  // Model options per provider
+  const modelOptionsByProvider = {
+    mock: [{ value: '', label: 'Default' }],
+    openai: [
+      { value: 'gpt-4o', label: 'GPT-4o' },
+      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+      { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+      { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+    ],
+    huggingface: [{ value: 'mistralai/Mistral-7B-Instruct-v0.2', label: 'Mistral 7B Instruct' }],
+    anthropic: [
+      { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+    ],
+    google: [
+      { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    ],
+    ollama: [{ value: '', label: 'Default (server-side)' }],
+    azure_openai: [
+      { value: 'gpt-4o', label: 'GPT-4o' },
+      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    ],
+    groq: [
+      { value: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B' },
+      { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
+    ],
+    together: [
+      { value: 'meta-llama/Llama-3-70b-chat-hf', label: 'Llama 3 70B' },
+      { value: 'mistralai/Mixtral-8x7B-Instruct-v0.1', label: 'Mixtral 8x7B' },
+    ],
+    custom: [{ value: '', label: 'Default (server-side)' }],
+  };
 
   const lastEventIdRef = useRef(0);
   const pollFallbackRef = useRef(null);
@@ -254,8 +291,10 @@ const Dashboard = () => {
         outputFormat: generationConfig.outputFormat,
         provider: generationConfig.provider,
         parseMode: generationConfig.parseMode,
+        language: generationConfig.language,
       };
 
+      if (generationConfig.modelName) payload.modelName = generationConfig.modelName;
       if (generationConfig.prompt.trim()) payload.prompt = generationConfig.prompt.trim();
       if (generationConfig.domainId) payload.domainId = generationConfig.domainId;
       if (generationConfig.domainDescription.trim()) {
@@ -356,6 +395,16 @@ const Dashboard = () => {
     { value: 'technology', label: 'Technology' },
     { value: 'science', label: 'Science' },
     { value: 'education', label: 'Education' },
+    { value: 'customer_support', label: 'Customer Support' },
+    { value: 'ecommerce', label: 'E-commerce' },
+    { value: 'realestate', label: 'Real Estate' },
+    { value: 'gaming', label: 'Gaming' },
+    { value: 'marketing', label: 'Marketing' },
+    { value: 'hr', label: 'Human Resources' },
+    { value: 'news', label: 'News & Journalism' },
+    { value: 'cybersecurity', label: 'Cybersecurity' },
+    { value: 'travel', label: 'Travel' },
+    { value: 'food', label: 'Food & Recipes' },
     { value: 'custom', label: 'Custom' },
   ];
 
@@ -366,15 +415,52 @@ const Dashboard = () => {
   ];
 
   const providerOptions = [
+    { value: 'auto', label: 'Auto (Smart Routing)' },
     { value: 'mock', label: 'Mock (Dev/CI)' },
     { value: 'openai', label: 'OpenAI' },
     { value: 'huggingface', label: 'Hugging Face' },
+    { value: 'anthropic', label: 'Anthropic Claude' },
+    { value: 'google', label: 'Google Gemini' },
+    { value: 'ollama', label: 'Ollama (Local)' },
+    { value: 'azure_openai', label: 'Azure OpenAI' },
+    { value: 'groq', label: 'Groq' },
+    { value: 'together', label: 'Together.ai' },
+    { value: 'custom', label: 'Custom Endpoint' },
   ];
 
   const parseModeOptions = [
     { value: 'qa', label: 'Q&A' },
     { value: 'text', label: 'Text' },
     { value: 'json', label: 'Structured JSON' },
+    { value: 'instruction', label: 'Instruction/Response' },
+    { value: 'conversation', label: 'Conversation' },
+    { value: 'classification', label: 'Classification' },
+    { value: 'summarization', label: 'Summarization' },
+    { value: 'code', label: 'Code Generation' },
+    { value: 'reasoning', label: 'Reasoning (CoT)' },
+  ];
+
+  const languageOptions = [
+    { value: 'en', label: 'English' },
+    { value: 'es', label: 'Spanish' },
+    { value: 'fr', label: 'French' },
+    { value: 'de', label: 'German' },
+    { value: 'it', label: 'Italian' },
+    { value: 'pt', label: 'Portuguese' },
+    { value: 'zh', label: 'Chinese' },
+    { value: 'ja', label: 'Japanese' },
+    { value: 'ko', label: 'Korean' },
+    { value: 'hi', label: 'Hindi' },
+    { value: 'ar', label: 'Arabic' },
+    { value: 'ru', label: 'Russian' },
+    { value: 'nl', label: 'Dutch' },
+    { value: 'pl', label: 'Polish' },
+    { value: 'tr', label: 'Turkish' },
+    { value: 'vi', label: 'Vietnamese' },
+    { value: 'th', label: 'Thai' },
+    { value: 'sv', label: 'Swedish' },
+    { value: 'da', label: 'Danish' },
+    { value: 'fi', label: 'Finnish' },
   ];
 
   const domainSelectionOptions = [
@@ -677,10 +763,25 @@ const Dashboard = () => {
                       label="Provider"
                       value={generationConfig.provider}
                       onChange={(e) =>
-                        setGenerationConfig((prev) => ({ ...prev, provider: e.target.value }))
+                        setGenerationConfig((prev) => ({
+                          ...prev,
+                          provider: e.target.value,
+                          modelName: (modelOptionsByProvider[e.target.value] || [])[0]?.value || '',
+                        }))
                       }
                       options={providerOptions}
                     />
+
+                    {(modelOptionsByProvider[generationConfig.provider] || []).length > 1 && (
+                      <Select
+                        label="Model"
+                        value={generationConfig.modelName}
+                        onChange={(e) =>
+                          setGenerationConfig((prev) => ({ ...prev, modelName: e.target.value }))
+                        }
+                        options={modelOptionsByProvider[generationConfig.provider] || []}
+                      />
+                    )}
 
                     <Select
                       label="Parse Mode"
@@ -689,6 +790,15 @@ const Dashboard = () => {
                         setGenerationConfig((prev) => ({ ...prev, parseMode: e.target.value }))
                       }
                       options={parseModeOptions}
+                    />
+
+                    <Select
+                      label="Language"
+                      value={generationConfig.language}
+                      onChange={(e) =>
+                        setGenerationConfig((prev) => ({ ...prev, language: e.target.value }))
+                      }
+                      options={languageOptions}
                     />
 
                     <Input

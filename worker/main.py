@@ -1,12 +1,15 @@
 import importlib.util
 import json
 import os
+import signal
 import sqlite3
 import sys
+import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -18,9 +21,14 @@ OUTPUTS_DIR = Path(os.environ.get("OUTPUTS_DIR", str(DATA_DIR / "outputs"))).res
 POLL_INTERVAL_MS = int(os.environ.get("POLL_INTERVAL_MS", "1000"))
 PROGRESS_UPDATE_INTERVAL_MS = int(os.environ.get("PROGRESS_UPDATE_INTERVAL_MS", "2000"))
 MAX_CONCURRENT_JOBS = int(os.environ.get("MAX_CONCURRENT_JOBS", "1"))
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
+DEAD_LETTER_THRESHOLD = int(os.environ.get("DEAD_LETTER_THRESHOLD", "5"))
 
-VALID_STATUSES = {"queued", "running", "completed", "failed", "stopped"}
-TERMINAL_STATUSES = {"completed", "failed", "stopped"}
+VALID_STATUSES = {"queued", "running", "completed", "failed", "stopped", "dead_letter"}
+TERMINAL_STATUSES = {"completed", "failed", "stopped", "dead_letter"}
+
+# Global shutdown flag — set by SIGTERM/SIGINT handler
+_shutdown_event = threading.Event()
 
 
 def now_iso() -> str:
@@ -108,6 +116,63 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         """
     )
 
+    # Ensure language column exists (migration v2)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "language" not in columns:
+        conn.execute("ALTER TABLE jobs ADD COLUMN language TEXT NOT NULL DEFAULT 'en'")
+
+    # Ensure retry_count column exists (migration v3)
+    if "retry_count" not in columns:
+        conn.execute("ALTER TABLE jobs ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0")
+
+
+def setup_signal_handlers() -> None:
+    """Register SIGTERM and SIGINT handlers for graceful shutdown."""
+    def _handle_signal(signum, frame):
+        sig_name = signal.Signals(signum).name
+        log("info", f"Received {sig_name}, initiating graceful shutdown...")
+        _shutdown_event.set()
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+
+def is_shutting_down() -> bool:
+    """Check if a shutdown signal has been received."""
+    return _shutdown_event.is_set()
+
+
+def increment_retry_count(conn: sqlite3.Connection, job_id: str) -> int:
+    """Increment the retry_count for a job and return the new count."""
+    conn.execute(
+        "UPDATE jobs SET retry_count = retry_count + 1, updated_at = ? WHERE id = ?",
+        (now_iso(), job_id),
+    )
+    row = conn.execute("SELECT retry_count FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    return int(row["retry_count"]) if row else 0
+
+
+def mark_dead_letter(conn: sqlite3.Connection, job_id: str, error_message: str) -> None:
+    """Move a job to dead_letter status after exceeding retry threshold."""
+    now = now_iso()
+    conn.execute(
+        """
+        UPDATE jobs
+        SET status = 'dead_letter',
+            error_message = ?,
+            completed_at = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (f"Dead letter after exceeding retry threshold: {error_message}", now, now, job_id),
+    )
+    add_event(conn, job_id, "status", {
+        "status": "dead_letter",
+        "message": f"Job moved to dead letter queue after {DEAD_LETTER_THRESHOLD} failures",
+        "error": error_message,
+    })
+    log("warn", "Job moved to dead letter queue", job_id=job_id, error=error_message)
+
 
 def add_event(conn: sqlite3.Connection, job_id: str, event_type: str, payload: Dict[str, Any]) -> None:
     conn.execute(
@@ -144,6 +209,39 @@ def claim_next_job(conn: sqlite3.Connection) -> Optional[str]:
         if updated != 1:
             return None
         return str(row["id"])
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+
+
+def claim_next_jobs(conn: sqlite3.Connection, count: int) -> List[str]:
+    """Claim up to `count` queued jobs in a single transaction."""
+    claimed = []
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        rows = conn.execute(
+            "SELECT id FROM jobs WHERE status = 'queued' ORDER BY datetime(created_at) ASC LIMIT ?",
+            (count,),
+        ).fetchall()
+        if not rows:
+            conn.execute("COMMIT")
+            return []
+
+        now = now_iso()
+        for row in rows:
+            updated = conn.execute(
+                """
+                UPDATE jobs
+                SET status = 'running', started_at = ?, updated_at = ?, stop_requested = 0
+                WHERE id = ? AND status = 'queued'
+                """,
+                (now, now, row["id"]),
+            ).rowcount
+            if updated == 1:
+                claimed.append(str(row["id"]))
+
+        conn.execute("COMMIT")
+        return claimed
     except Exception:
         conn.execute("ROLLBACK")
         raise
@@ -277,6 +375,21 @@ def build_prompt(job_row: sqlite3.Row, config_json: Dict[str, Any]) -> str:
     return f"Generate high-quality synthetic data for the {job_row['domain']} domain."
 
 
+def _add_language_instruction(prompt: str, language: str) -> str:
+    """Add language instruction to prompt if not English."""
+    if language == "en":
+        return prompt
+    lang_names = {
+        "es": "Spanish", "fr": "French", "de": "German", "it": "Italian",
+        "pt": "Portuguese", "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
+        "hi": "Hindi", "ar": "Arabic", "ru": "Russian", "nl": "Dutch",
+        "pl": "Polish", "tr": "Turkish", "vi": "Vietnamese", "th": "Thai",
+        "sv": "Swedish", "da": "Danish", "fi": "Finnish",
+    }
+    lang_name = lang_names.get(language, language)
+    return f"{prompt}\n\nIMPORTANT: Generate all content in {lang_name} ({language})."
+
+
 def run_job(conn: sqlite3.Connection, job_id: str) -> None:
     job = load_job(conn, job_id)
     if job is None:
@@ -361,6 +474,11 @@ def run_job(conn: sqlite3.Connection, job_id: str) -> None:
         )
 
         prompt = build_prompt(job, config_json)
+
+        # Add language instruction
+        language = str(job["language"] if "language" in job.keys() else config_json.get("language", "en")).lower()
+        prompt = _add_language_instruction(prompt, language)
+
         parse_mode = str(job["parse_mode"]).lower()
         extra_fields = config_json.get("extraFields")
         if not isinstance(extra_fields, list):
@@ -385,7 +503,7 @@ def run_job(conn: sqlite3.Connection, job_id: str) -> None:
             last_progress_emit = now
 
         def should_stop() -> bool:
-            return is_stop_requested(conn, job_id)
+            return is_stop_requested(conn, job_id) or is_shutting_down()
 
         result = generator.run(
             user_prompt=prompt,
@@ -410,7 +528,32 @@ def run_job(conn: sqlite3.Connection, job_id: str) -> None:
     update_progress(conn, job_id, result)
     current = load_job(conn, job_id)
     if current is not None and current["status"] not in TERMINAL_STATUSES:
-        set_job_terminal(conn, job_id, result_status, result, result_error)
+        # Retry logic for failed jobs
+        if result_status == "failed" and result_error and not is_shutting_down():
+            retry_count = increment_retry_count(conn, job_id)
+            if retry_count >= DEAD_LETTER_THRESHOLD:
+                mark_dead_letter(conn, job_id, result_error)
+            elif retry_count <= MAX_RETRIES:
+                # Re-queue for retry with backoff delay
+                backoff_seconds = min(2 ** retry_count, 60)
+                log("info", "Re-queuing failed job for retry",
+                    job_id=job_id, retry_count=retry_count, backoff_seconds=backoff_seconds)
+                time.sleep(backoff_seconds)
+                now = now_iso()
+                conn.execute(
+                    """UPDATE jobs SET status = 'queued', started_at = NULL,
+                       stop_requested = 0, error_message = NULL, updated_at = ?
+                       WHERE id = ?""",
+                    (now, job_id),
+                )
+                add_event(conn, job_id, "status", {
+                    "status": "queued",
+                    "message": f"Auto-retry #{retry_count} after {backoff_seconds}s backoff",
+                })
+            else:
+                set_job_terminal(conn, job_id, result_status, result, result_error)
+        else:
+            set_job_terminal(conn, job_id, result_status, result, result_error)
 
     log(
         "info",
@@ -453,21 +596,45 @@ def recover_stale_running_jobs(conn: sqlite3.Connection) -> None:
     log("warn", "Recovered stale running jobs", count=len(rows))
 
 
+def _run_single_job_wrapper(job_id: str) -> None:
+    """Run a single job in its own connection (for thread pool)."""
+    conn = open_conn()
+    try:
+        run_job(conn, job_id)
+    except Exception as exc:
+        log("error", "Job wrapper error", job_id=job_id, error=str(exc), traceback=traceback.format_exc())
+    finally:
+        conn.close()
+
+
 def worker_loop() -> int:
-    if MAX_CONCURRENT_JOBS != 1:
-        log(
-            "warn",
-            "Current worker implementation is single-concurrency; forcing MAX_CONCURRENT_JOBS=1",
-            configured_max=MAX_CONCURRENT_JOBS,
-        )
+    setup_signal_handlers()
+
+    concurrency = max(1, MAX_CONCURRENT_JOBS)
+    log("info", "Worker starting",
+        max_concurrent_jobs=concurrency,
+        max_retries=MAX_RETRIES,
+        dead_letter_threshold=DEAD_LETTER_THRESHOLD,
+        sqlite_path=str(SQLITE_PATH),
+        outputs_dir=str(OUTPUTS_DIR))
 
     conn = open_conn()
     ensure_schema(conn)
     recover_stale_running_jobs(conn)
-    log("info", "Worker started", sqlite_path=str(SQLITE_PATH), outputs_dir=str(OUTPUTS_DIR))
+    conn.close()
 
+    if concurrency == 1:
+        # Single-threaded mode (original behavior, no thread pool overhead)
+        return _worker_loop_single()
+    else:
+        # Multi-threaded mode with thread pool
+        return _worker_loop_concurrent(concurrency)
+
+
+def _worker_loop_single() -> int:
+    conn = open_conn()
     try:
-        while True:
+        while not is_shutting_down():
             try:
                 job_id = claim_next_job(conn)
                 if not job_id:
@@ -483,9 +650,59 @@ def worker_loop() -> int:
                 time.sleep(max(0.2, POLL_INTERVAL_MS / 1000.0))
     except KeyboardInterrupt:
         log("info", "Worker interrupted, exiting")
-        return 0
     finally:
+        if is_shutting_down():
+            log("info", "Shutdown signal received, closing gracefully")
         conn.close()
+    return 0
+
+
+def _worker_loop_concurrent(concurrency: int) -> int:
+    active_futures = {}
+    claim_conn = open_conn()
+
+    try:
+        with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="job") as executor:
+            while not is_shutting_down():
+                try:
+                    # Clean up completed futures
+                    done_ids = []
+                    for jid, future in active_futures.items():
+                        if future.done():
+                            done_ids.append(jid)
+                            exc = future.exception()
+                            if exc:
+                                log("error", "Job thread error", job_id=jid, error=str(exc))
+                    for jid in done_ids:
+                        del active_futures[jid]
+
+                    # Claim jobs to fill available slots
+                    available = concurrency - len(active_futures)
+                    if available > 0:
+                        job_ids = claim_next_jobs(claim_conn, available)
+                        for jid in job_ids:
+                            log("info", "Claimed job", job_id=jid, slot=len(active_futures) + 1)
+                            active_futures[jid] = executor.submit(_run_single_job_wrapper, jid)
+
+                    if not active_futures:
+                        time.sleep(POLL_INTERVAL_MS / 1000.0)
+                    else:
+                        time.sleep(max(0.1, POLL_INTERVAL_MS / 2000.0))
+
+                except KeyboardInterrupt:
+                    raise
+                except Exception as exc:
+                    log("error", "Worker loop error", error=str(exc), traceback=traceback.format_exc())
+                    time.sleep(max(0.2, POLL_INTERVAL_MS / 1000.0))
+    except KeyboardInterrupt:
+        log("info", "Worker interrupted, waiting for active jobs to finish...")
+    finally:
+        if is_shutting_down() and active_futures:
+            log("info", "Shutdown requested, waiting for active jobs to complete...",
+                active_jobs=len(active_futures))
+        # ThreadPoolExecutor.__exit__ will wait for futures
+        claim_conn.close()
+    return 0
 
 
 if __name__ == "__main__":

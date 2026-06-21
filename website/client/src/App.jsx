@@ -7,6 +7,7 @@ import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import Templates from './pages/Templates';
 import DomainBuilder from './pages/DomainBuilder';
+import ProviderSettings from './pages/ProviderSettings';
 import Documentation from './pages/Documentation';
 import NotFound from './pages/NotFound';
 
@@ -47,6 +48,7 @@ function AppContent() {
               /dashboard      → Dashboard
               /templates      → Templates
               /domain-builder → DomainBuilder
+              /providers      → ProviderSettings
               /documentation  → Documentation
               *               → NotFound
 
@@ -59,6 +61,7 @@ function AppContent() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/domain-builder" element={<DomainBuilder />} />
+            <Route path="/providers" element={<ProviderSettings />} />
             <Route path="/documentation" element={<Documentation />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

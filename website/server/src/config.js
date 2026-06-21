@@ -28,9 +28,14 @@ const parseCsvEnv = (value) => {
 const defaultDataDir = path.resolve(__dirname, '..', 'data');
 const dataDir = process.env.DATA_DIR || defaultDataDir;
 
-const config = {
+const validAuthModes = ['none', 'api_key'];
+const rawAuthMode = (process.env.AUTH_MODE || 'none').toLowerCase();
+const authMode = validAuthModes.includes(rawAuthMode) ? rawAuthMode : 'none';
+
+const config = Object.freeze({
   port: parseIntEnv('PORT', 3001, 1),
   nodeEnv: process.env.NODE_ENV || 'development',
+  logLevel: (process.env.LOG_LEVEL || 'info').toLowerCase(),
 
   dataDir,
   sqlitePath: process.env.SQLITE_PATH || path.join(dataDir, 'synthgen.sqlite'),
@@ -38,7 +43,7 @@ const config = {
 
   maxBodySize: process.env.MAX_BODY_SIZE || '50kb',
 
-  authMode: (process.env.AUTH_MODE || 'none').toLowerCase(),
+  authMode,
   apiKeys: parseCsvEnv(process.env.API_KEYS),
 
   targetCountMin: parseIntEnv('TARGET_COUNT_MIN', 100, 1),
@@ -60,7 +65,8 @@ const config = {
   sseHeartbeatMs: parseIntEnv('SSE_HEARTBEAT_MS', 15000, 1000),
 
   defaultProvider: (process.env.DEFAULT_PROVIDER || 'mock').toLowerCase(),
-};
+  maxConcurrentJobs: parseIntEnv('MAX_CONCURRENT_JOBS', 1, 1, 16),
+});
 
 module.exports = {
   config,

@@ -1,25 +1,15 @@
 {
   "name": "synthgen-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Backend API server for Synthetic Data Generator",
-  "_educational_notes": {
-    "purpose": "Production-like Express API with durable SQLite jobs/events consumed by website/client and worker/main.py.",
-    "how_to_run": [
-      "cd website/server",
-      "npm install",
-      "npm start"
-    ],
-    "lockfile_note": "package-lock.json is tool-managed. Prefer editing dependencies with npm and committing the resulting lockfile changes.",
-    "see_docs": [
-      "../../docs/WEB_PLATFORM.md",
-      "../../docs/REPO_TOUR.md"
-    ]
-  },
   "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js",
-    "test": "node --test"
+    "dev": "node --watch index.js",
+    "test": "node --test src/__tests__/*.test.js"
   },
   "keywords": [
     "synthetic-data",
@@ -34,7 +24,6 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
     "pino": "^10.3.1",
-    "pino-http": "^11.0.0",
-    "uuid": "^9.0.1"
+    "pino-http": "^11.0.0"
   }
 }

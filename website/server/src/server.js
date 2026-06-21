@@ -20,17 +20,49 @@ const {
   deleteArtifactsDirectory,
 } = require('./db');
 
-const validDomains = ['financial', 'healthcare', 'legal', 'technology', 'science', 'education', 'custom'];
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const validDomains = [
+  'financial', 'healthcare', 'legal', 'technology', 'science', 'education',
+  'customer_support', 'ecommerce', 'realestate', 'gaming', 'marketing',
+  'hr', 'news', 'cybersecurity', 'travel', 'food', 'custom',
+];
+
 const validOutputFormats = ['jsonl', 'csv', 'json'];
-const validProviders = ['huggingface', 'openai', 'mock'];
-const validParseModes = ['qa', 'text', 'json'];
+
+const validProviders = [
+  'auto', 'mock', 'openai', 'huggingface', 'anthropic', 'google',
+  'ollama', 'azure_openai', 'groq', 'together', 'custom',
+  'aws_bedrock', 'replicate',
+];
+
+const validParseModes = [
+  'qa', 'text', 'json', 'instruction', 'conversation',
+  'classification', 'ner', 'summarization', 'translation', 'code', 'reasoning',
+];
+
 const terminalStatuses = ['completed', 'failed', 'stopped'];
 
+const validLanguages = [
+  'en', 'es', 'fr', 'de', 'it', 'pt', 'zh', 'ja', 'ko', 'hi',
+  'ar', 'ru', 'nl', 'pl', 'tr', 'vi', 'th', 'sv', 'da', 'fi',
+];
+
+// ---------------------------------------------------------------------------
+// Logger & DB
+// ---------------------------------------------------------------------------
+
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: config.logLevel,
 });
 
 const db = initDatabase(config);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const idJob = () => `gen_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
 const idDomain = () => `domain_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
@@ -52,6 +84,18 @@ const isLocalRequest = (req) => {
   const raw = (req.ip || req.socket?.remoteAddress || '').replace('::ffff:', '');
   return raw === '127.0.0.1' || raw === '::1' || raw.startsWith('127.');
 };
+
+/**
+ * Wraps an async route handler so thrown/rejected errors reach Express error handler.
+ * Express 4 does not catch promise rejections in route handlers.
+ */
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
 
 const extractApiKey = (req) => {
   const xApiKey = req.get('x-api-key');
@@ -90,6 +134,10 @@ const authMiddleware = (req, res, next) => {
   res.status(401).json({ error: 'Unauthorized' });
 };
 
+// ---------------------------------------------------------------------------
+// Rate Limiters
+// ---------------------------------------------------------------------------
+
 const rateKeyGenerator = (req) => rateLimit.ipKeyGenerator(req.ip);
 
 const generalLimiter = rateLimit({
@@ -119,7 +167,12 @@ const downloadLimiter = rateLimit({
   message: { error: 'Download rate limit exceeded' },
 });
 
+// ---------------------------------------------------------------------------
+// Prepared Statements & Queries
+// ---------------------------------------------------------------------------
+
 const getJobRow = db.prepare('SELECT * FROM jobs WHERE id = ?');
+const getDomainRow = db.prepare('SELECT * FROM domains WHERE id = ?');
 
 const createDomainPrompt = (configJson, fallbackDomain) => {
   const cfg = safeJsonParse(configJson, {});
@@ -328,9 +381,34 @@ const cleanupOldJobs = () => {
   return rows.length;
 };
 
+// ---------------------------------------------------------------------------
+// Provider helpers (for /api/providers endpoints)
+// ---------------------------------------------------------------------------
+
+const providerConfigs = {
+  auto: { name: 'Auto (Smart Routing)', description: 'Automatically selects the best provider based on task complexity and availability', models: ['auto'], requiresKey: false },
+  mock: { name: 'Mock', description: 'Deterministic test provider (no API key needed)', models: ['mock'], requiresKey: false },
+  openai: { name: 'OpenAI', description: 'GPT-4o, GPT-4o-mini, GPT-3.5-turbo', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'], requiresKey: true, envVar: 'OPENAI_API_KEY' },
+  huggingface: { name: 'HuggingFace', description: 'Local models via Transformers (GPU recommended)', models: ['mistralai/Mistral-7B-Instruct-v0.2', 'meta-llama/Llama-2-7b-chat-hf'], requiresKey: false },
+  anthropic: { name: 'Anthropic', description: 'Claude 4 family', models: ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001'], requiresKey: true, envVar: 'ANTHROPIC_API_KEY' },
+  google: { name: 'Google', description: 'Gemini 2.5 family', models: ['gemini-2.5-pro', 'gemini-2.5-flash'], requiresKey: true, envVar: 'GOOGLE_API_KEY' },
+  ollama: { name: 'Ollama', description: 'Local models via Ollama server', models: ['llama3', 'mistral', 'codellama'], requiresKey: false, envVar: 'OLLAMA_HOST' },
+  azure_openai: { name: 'Azure OpenAI', description: 'Enterprise OpenAI via Azure', models: ['gpt-4o', 'gpt-4o-mini'], requiresKey: true, envVar: 'AZURE_OPENAI_API_KEY' },
+  groq: { name: 'Groq', description: 'Ultra-fast inference', models: ['llama-3.1-70b-versatile', 'mixtral-8x7b-32768'], requiresKey: true, envVar: 'GROQ_API_KEY' },
+  together: { name: 'Together.ai', description: 'Open model hosting', models: ['meta-llama/Llama-3-70b-chat-hf', 'mistralai/Mixtral-8x7B-Instruct-v0.1'], requiresKey: true, envVar: 'TOGETHER_API_KEY' },
+  custom: { name: 'Custom Endpoint', description: 'Any OpenAI-compatible API (vLLM, TGI, llama.cpp)', models: ['custom'], requiresKey: false, envVar: 'CUSTOM_API_BASE' },
+  aws_bedrock: { name: 'AWS Bedrock', description: 'Multi-model access via AWS Bedrock (Claude, Llama, Mistral)', models: ['anthropic.claude-3-5-sonnet-20241022-v2:0', 'meta.llama3-1-70b-instruct-v1:0'], requiresKey: true, envVar: 'AWS_REGION' },
+  replicate: { name: 'Replicate', description: 'Open-source model hosting in the cloud', models: ['meta/llama-2-70b-chat', 'mistralai/mixtral-8x7b-instruct-v0.1'], requiresKey: true, envVar: 'REPLICATE_API_TOKEN' },
+};
+
+// ---------------------------------------------------------------------------
+// Express Application
+// ---------------------------------------------------------------------------
+
 const createApp = () => {
   const app = express();
 
+  // Middleware
   app.use(
     pinoHttp({
       logger,
@@ -351,14 +429,23 @@ const createApp = () => {
   app.use(authMiddleware);
   app.use('/api', generalLimiter);
 
+  // -------------------------------------------------------------------------
+  // Health & Info
+  // -------------------------------------------------------------------------
+
   app.get('/api/health', (_req, res) => {
     res.json({
       status: 'ok',
       timestamp: nowIso(),
       sqlitePath: config.sqlitePath,
       outputsDir: config.outputsDir,
+      version: '2.0.0',
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Templates
+  // -------------------------------------------------------------------------
 
   app.get('/api/templates', (_req, res) => {
     res.json({ templates });
@@ -373,6 +460,82 @@ const createApp = () => {
     res.json(template);
   });
 
+  // -------------------------------------------------------------------------
+  // Providers
+  // -------------------------------------------------------------------------
+
+  app.get('/api/providers', (_req, res) => {
+    const providers = Object.entries(providerConfigs).map(([key, cfg]) => {
+      let configured = !cfg.requiresKey;
+      if (cfg.requiresKey && cfg.envVar) {
+        configured = Boolean(process.env[cfg.envVar]);
+      }
+      return {
+        id: key,
+        name: cfg.name,
+        description: cfg.description,
+        models: cfg.models,
+        requiresKey: cfg.requiresKey,
+        configured,
+      };
+    });
+    res.json({ providers });
+  });
+
+  app.get('/api/providers/:name', (req, res) => {
+    const name = req.params.name.toLowerCase();
+    const cfg = providerConfigs[name];
+    if (!cfg) {
+      res.status(404).json({ error: 'Provider not found' });
+      return;
+    }
+
+    let configured = !cfg.requiresKey;
+    if (cfg.requiresKey && cfg.envVar) {
+      configured = Boolean(process.env[cfg.envVar]);
+    }
+
+    res.json({
+      id: name,
+      name: cfg.name,
+      description: cfg.description,
+      models: cfg.models,
+      requiresKey: cfg.requiresKey,
+      configured,
+    });
+  });
+
+  app.get('/api/providers/:name/health', (req, res) => {
+    const name = req.params.name.toLowerCase();
+    const cfg = providerConfigs[name];
+    if (!cfg) {
+      res.status(404).json({ error: 'Provider not found' });
+      return;
+    }
+
+    let status = 'unconfigured';
+    let configured = false;
+
+    if (!cfg.requiresKey) {
+      status = 'available';
+      configured = true;
+    } else if (cfg.envVar && process.env[cfg.envVar]) {
+      configured = true;
+      status = 'configured'; // Actual health check would require calling the provider API
+    }
+
+    res.json({
+      provider: name,
+      status,
+      configured,
+      timestamp: nowIso(),
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Generate
+  // -------------------------------------------------------------------------
+
   app.post('/api/generate', generateLimiter, (req, res) => {
     const body = req.body || {};
     const now = nowIso();
@@ -381,6 +544,7 @@ const createApp = () => {
     const outputFormat = typeof body.outputFormat === 'string' ? body.outputFormat.trim().toLowerCase() : 'jsonl';
     const provider = typeof body.provider === 'string' ? body.provider.trim().toLowerCase() : config.defaultProvider;
     const parseMode = typeof body.parseMode === 'string' ? body.parseMode.trim().toLowerCase() : 'qa';
+    const language = typeof body.language === 'string' ? body.language.trim().toLowerCase() : 'en';
     const targetCountInput = Number.parseInt(body.targetCount ?? '1000', 10);
     const batchSizeInput = Number.parseInt(body.batchSize ?? '25', 10);
     const targetCount = Number.isNaN(targetCountInput) ? 1000 : targetCountInput;
@@ -420,12 +584,42 @@ const createApp = () => {
       return;
     }
 
+    if (!validLanguages.includes(language)) {
+      res.status(400).json({ error: `Invalid language. Must be one of: ${validLanguages.join(', ')}` });
+      return;
+    }
+
+    // Resolve 'auto' provider to a real one based on configured providers
+    let resolvedProvider = provider;
+    let autoReason = '';
+    if (provider === 'auto') {
+      const configuredProviders = Object.entries(providerConfigs)
+        .filter(([key, cfg]) => key !== 'auto' && key !== 'mock' && (cfg.requiresKey ? Boolean(process.env[cfg.envVar]) : true))
+        .map(([key]) => key);
+
+      if (configuredProviders.length === 0) {
+        resolvedProvider = 'mock';
+        autoReason = 'No API providers configured, using mock';
+      } else {
+        // Simple heuristic: prefer fast/cheap for small jobs, quality for large
+        const pref = targetCount > 10000 ? 'speed' : targetCount < 500 ? 'quality' : 'balanced';
+        const tierOrder = {
+          speed: ['groq', 'openai', 'anthropic', 'google', 'together', 'ollama', 'huggingface', 'azure_openai', 'aws_bedrock', 'replicate', 'custom'],
+          quality: ['anthropic', 'openai', 'google', 'aws_bedrock', 'azure_openai', 'groq', 'together', 'ollama', 'huggingface', 'replicate', 'custom'],
+          balanced: ['openai', 'anthropic', 'google', 'groq', 'azure_openai', 'together', 'ollama', 'huggingface', 'aws_bedrock', 'replicate', 'custom'],
+        };
+        const order = tierOrder[pref] || tierOrder.balanced;
+        resolvedProvider = order.find((p) => configuredProviders.includes(p)) || configuredProviders[0];
+        autoReason = `Auto-selected ${resolvedProvider} (preference=${pref}, ${configuredProviders.length} providers available)`;
+      }
+    }
+
     const domainId = typeof body.domainId === 'string' ? body.domainId.trim() : '';
     const explicitPrompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
 
     let domainRow = null;
     if (domainId) {
-      domainRow = db.prepare('SELECT * FROM domains WHERE id = ?').get(domainId);
+      domainRow = getDomainRow.get(domainId);
       if (!domainRow) {
         res.status(404).json({ error: 'Domain not found' });
         return;
@@ -443,13 +637,17 @@ const createApp = () => {
       targetCount,
       batchSize,
       outputFormat,
-      provider,
+      provider: resolvedProvider,
+      requestedProvider: provider !== resolvedProvider ? provider : undefined,
+      autoReason: autoReason || undefined,
       parseMode,
+      language,
       prompt,
       domainId: domainId || null,
       domainDescription,
       topics: normalizedTopics,
       extraFields: normalizedExtraFields,
+      modelName: typeof body.modelName === 'string' ? body.modelName.trim() : undefined,
     };
 
     const jobId = idJob();
@@ -458,18 +656,19 @@ const createApp = () => {
     db.prepare(
       `INSERT INTO jobs (
         id, status, domain, config_json, prompt, provider, parse_mode, output_format,
-        target_count, batch_size, output_dir, created_at, updated_at
-      ) VALUES (?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        target_count, batch_size, language, output_dir, created_at, updated_at
+      ) VALUES (?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       jobId,
       domain,
       JSON.stringify(normalizedConfig),
       prompt || null,
-      provider,
+      resolvedProvider,
       parseMode,
       outputFormat,
       targetCount,
       batchSize,
+      language,
       outputDir,
       now,
       now
@@ -487,6 +686,10 @@ const createApp = () => {
       config: normalizedConfig,
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Jobs
+  // -------------------------------------------------------------------------
 
   app.get('/api/jobs', (req, res) => {
     const page = Math.max(1, Number.parseInt(req.query.page ?? '1', 10) || 1);
@@ -677,6 +880,10 @@ const createApp = () => {
     res.json({ message: 'Job deleted successfully' });
   });
 
+  // -------------------------------------------------------------------------
+  // Downloads & Preview
+  // -------------------------------------------------------------------------
+
   app.get('/api/downloads/:jobId/:format', downloadLimiter, (req, res) => {
     const jobId = req.params.jobId;
     const format = String(req.params.format || '').toLowerCase();
@@ -731,7 +938,7 @@ const createApp = () => {
     stream.pipe(res);
   });
 
-  app.get('/api/jobs/:jobId/preview', async (req, res) => {
+  app.get('/api/jobs/:jobId/preview', asyncHandler(async (req, res) => {
     const row = getJobRow.get(req.params.jobId);
     if (!row) {
       res.status(404).json({ error: 'Job not found' });
@@ -754,19 +961,18 @@ const createApp = () => {
       return;
     }
 
-    try {
-      const records = await readPreview(outputPath, format, limit);
-      res.json({
-        jobId: row.id,
-        format,
-        limit,
-        records,
-      });
-    } catch (error) {
-      req.log.error({ err: error, jobId: row.id }, 'Failed to read preview');
-      res.status(500).json({ error: 'Failed to read preview' });
-    }
-  });
+    const records = await readPreview(outputPath, format, limit);
+    res.json({
+      jobId: row.id,
+      format,
+      limit,
+      records,
+    });
+  }));
+
+  // -------------------------------------------------------------------------
+  // Domains CRUD
+  // -------------------------------------------------------------------------
 
   app.post('/api/domains', (req, res) => {
     const body = req.body || {};
@@ -774,6 +980,12 @@ const createApp = () => {
 
     if (typeof body.name !== 'string' || body.name.trim().length < 1) {
       res.status(400).json({ error: 'Domain name is required' });
+      return;
+    }
+
+    const name = body.name.trim();
+    if (name.length > 200) {
+      res.status(400).json({ error: 'Domain name must be 200 characters or fewer' });
       return;
     }
 
@@ -788,7 +1000,7 @@ const createApp = () => {
 
     db.prepare(
       'INSERT INTO domains (id, name, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, body.name.trim(), configJson, now, now);
+    ).run(id, name, configJson, now, now);
 
     res.json({ id, message: 'Domain configuration saved successfully' });
   });
@@ -799,13 +1011,64 @@ const createApp = () => {
   });
 
   app.get('/api/domains/:id', (req, res) => {
-    const row = db.prepare('SELECT * FROM domains WHERE id = ?').get(req.params.id);
+    const row = getDomainRow.get(req.params.id);
     if (!row) {
       res.status(404).json({ error: 'Domain not found' });
       return;
     }
     res.json(toApiDomain(row));
   });
+
+  app.put('/api/domains/:id', (req, res) => {
+    const row = getDomainRow.get(req.params.id);
+    if (!row) {
+      res.status(404).json({ error: 'Domain not found' });
+      return;
+    }
+
+    const body = req.body || {};
+    const now = nowIso();
+
+    if (typeof body.name === 'string') {
+      const name = body.name.trim();
+      if (name.length < 1) {
+        res.status(400).json({ error: 'Domain name cannot be empty' });
+        return;
+      }
+      if (name.length > 200) {
+        res.status(400).json({ error: 'Domain name must be 200 characters or fewer' });
+        return;
+      }
+    }
+
+    const updatedConfig = { ...safeJsonParse(row.config_json, {}), ...body };
+    const name = typeof body.name === 'string' ? body.name.trim() : row.name;
+
+    db.prepare('UPDATE domains SET name = ?, config_json = ?, updated_at = ? WHERE id = ?').run(
+      name,
+      JSON.stringify(updatedConfig),
+      now,
+      req.params.id
+    );
+
+    const updated = getDomainRow.get(req.params.id);
+    res.json(toApiDomain(updated));
+  });
+
+  app.delete('/api/domains/:id', (req, res) => {
+    const row = getDomainRow.get(req.params.id);
+    if (!row) {
+      res.status(404).json({ error: 'Domain not found' });
+      return;
+    }
+
+    db.prepare('DELETE FROM domains WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Domain deleted successfully' });
+  });
+
+  // -------------------------------------------------------------------------
+  // Metrics
+  // -------------------------------------------------------------------------
 
   app.get('/api/metrics', (_req, res) => {
     const statusCounts = db
@@ -862,6 +1125,10 @@ const createApp = () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // Error Handler
+  // -------------------------------------------------------------------------
+
   app.use((error, _req, res, _next) => {
     logger.error({ err: error }, 'Unhandled server error');
     res.status(500).json({ error: 'Internal server error' });
@@ -870,47 +1137,60 @@ const createApp = () => {
   return app;
 };
 
+// ---------------------------------------------------------------------------
+// Server Lifecycle
+// ---------------------------------------------------------------------------
+
 const start = () => {
-  const app = createApp();
-
-  const cleanedCount = cleanupOldJobs();
-  if (cleanedCount > 0) {
-    logger.info({ cleanedCount }, 'Old jobs cleaned on startup');
-  }
-
-  const cleanupHandle = setInterval(() => {
+  return new Promise((resolve, reject) => {
     try {
-      const removed = cleanupOldJobs();
-      if (removed > 0) {
-        logger.info({ removed }, 'Retention cleanup removed jobs');
+      const app = createApp();
+
+      const cleanedCount = cleanupOldJobs();
+      if (cleanedCount > 0) {
+        logger.info({ cleanedCount }, 'Old jobs cleaned on startup');
       }
+
+      const cleanupHandle = setInterval(() => {
+        try {
+          const removed = cleanupOldJobs();
+          if (removed > 0) {
+            logger.info({ removed }, 'Retention cleanup removed jobs');
+          }
+        } catch (error) {
+          logger.error({ err: error }, 'Retention cleanup failed');
+        }
+      }, config.cleanupIntervalMs);
+
+      const server = app.listen(config.port, () => {
+        logger.info({ port: config.port }, 'API server listening');
+        resolve({ app, server, db });
+      });
+
+      server.on('error', (error) => {
+        reject(error);
+      });
+
+      const shutdown = (signalName) => {
+        logger.info({ signal: signalName }, 'Shutting down API server');
+        clearInterval(cleanupHandle);
+
+        server.close(() => {
+          try {
+            db.close();
+          } catch {
+            // ignore
+          }
+          process.exit(0);
+        });
+      };
+
+      process.on('SIGINT', () => shutdown('SIGINT'));
+      process.on('SIGTERM', () => shutdown('SIGTERM'));
     } catch (error) {
-      logger.error({ err: error }, 'Retention cleanup failed');
+      reject(error);
     }
-  }, config.cleanupIntervalMs);
-
-  const server = app.listen(config.port, () => {
-    logger.info({ port: config.port }, 'API server listening');
   });
-
-  const shutdown = (signalName) => {
-    logger.info({ signal: signalName }, 'Shutting down API server');
-    clearInterval(cleanupHandle);
-
-    server.close(() => {
-      try {
-        db.close();
-      } catch {
-        // ignore
-      }
-      process.exit(0);
-    });
-  };
-
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-
-  return { app, server, db };
 };
 
 module.exports = {

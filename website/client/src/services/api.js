@@ -24,10 +24,18 @@ const handleResponse = async (response) => {
 };
 
 export const api = {
+  // -----------------------------------------------------------------------
+  // Health
+  // -----------------------------------------------------------------------
+
   checkHealth: async () => {
     const response = await fetch(`${API_BASE}/health`);
     return handleResponse(response);
   },
+
+  // -----------------------------------------------------------------------
+  // Generation
+  // -----------------------------------------------------------------------
 
   startGeneration: async (config) => {
     const response = await fetch(`${API_BASE}/generate`, {
@@ -37,6 +45,10 @@ export const api = {
     });
     return handleResponse(response);
   },
+
+  // -----------------------------------------------------------------------
+  // Jobs
+  // -----------------------------------------------------------------------
 
   getJobStatus: async (jobId) => {
     const response = await fetch(`${API_BASE}/jobs/${jobId}`);
@@ -86,6 +98,10 @@ export const api = {
     return new EventSource(`${API_BASE}/jobs/${jobId}/events${buildQuery({ sinceId })}`);
   },
 
+  // -----------------------------------------------------------------------
+  // Templates
+  // -----------------------------------------------------------------------
+
   getTemplates: async () => {
     const response = await fetch(`${API_BASE}/templates`);
     return handleResponse(response);
@@ -95,6 +111,29 @@ export const api = {
     const response = await fetch(`${API_BASE}/templates/${templateId}`);
     return handleResponse(response);
   },
+
+  // -----------------------------------------------------------------------
+  // Providers
+  // -----------------------------------------------------------------------
+
+  getProviders: async () => {
+    const response = await fetch(`${API_BASE}/providers`);
+    return handleResponse(response);
+  },
+
+  getProvider: async (providerName) => {
+    const response = await fetch(`${API_BASE}/providers/${providerName}`);
+    return handleResponse(response);
+  },
+
+  getProviderHealth: async (providerName) => {
+    const response = await fetch(`${API_BASE}/providers/${providerName}/health`);
+    return handleResponse(response);
+  },
+
+  // -----------------------------------------------------------------------
+  // Domains CRUD
+  // -----------------------------------------------------------------------
 
   saveDomain: async (domainConfig) => {
     const response = await fetch(`${API_BASE}/domains`, {
@@ -112,6 +151,31 @@ export const api = {
 
   listDomains: async () => {
     const response = await fetch(`${API_BASE}/domains`);
+    return handleResponse(response);
+  },
+
+  updateDomain: async (domainId, domainConfig) => {
+    const response = await fetch(`${API_BASE}/domains/${domainId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(domainConfig),
+    });
+    return handleResponse(response);
+  },
+
+  deleteDomain: async (domainId) => {
+    const response = await fetch(`${API_BASE}/domains/${domainId}`, {
+      method: 'DELETE',
+    });
+    return handleResponse(response);
+  },
+
+  // -----------------------------------------------------------------------
+  // Metrics
+  // -----------------------------------------------------------------------
+
+  getMetrics: async () => {
+    const response = await fetch(`${API_BASE}/metrics`);
     return handleResponse(response);
   },
 };

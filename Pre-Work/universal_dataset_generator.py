@@ -165,6 +165,15 @@ class ModelProvider(Enum):
     HUGGINGFACE = auto()
     OPENAI = auto()
     MOCK = auto()  # For testing
+    ANTHROPIC = auto()
+    GOOGLE = auto()
+    OLLAMA = auto()
+    AZURE_OPENAI = auto()
+    GROQ = auto()
+    TOGETHER = auto()
+    CUSTOM = auto()
+    AWS_BEDROCK = auto()
+    REPLICATE = auto()
 
 
 @dataclass
@@ -282,16 +291,13 @@ class AsyncFileWriter:
     """
     High-performance async file writer with buffering.
 
-    Why this exists (educational note):
-    - Writing every record synchronously can dominate runtime for large datasets.
-    - Buffering + background flushing keeps the generator compute-bound.
-
-    Format behavior:
-    - JSONL: stream-friendly; we append each flushed batch as lines (safe for large datasets).
-    - JSON/CSV: we accumulate all items in memory (`_all_items`) and write once at the end.
-      This is convenient but can be memory-heavy for huge targets.
+    All formats are now stream-friendly:
+    - JSONL: append one JSON object per line (fastest, most memory-efficient).
+    - CSV: write header on first flush, then append rows incrementally.
+    - JSON: stream as JSON Lines to a temp file, then wrap into a JSON array on stop.
+      For very large datasets, consider using JSONL instead.
     """
-    
+
     def __init__(self, filepath: str, output_format: str = "jsonl", buffer_size: int = 50):
         self.filepath = filepath
         self.format = output_format
@@ -299,20 +305,27 @@ class AsyncFileWriter:
         self._queue = queue.Queue(maxsize=5000)
         self._stop_event = threading.Event()
         self._written = AtomicCounter()
-        self._all_items = []  # For JSON/CSV formats
-        
+
+        # CSV state
+        self._csv_headers_written = False
+        self._csv_fieldnames = None
+
+        # JSON state: track count for final assembly
+        self._json_count = 0
+        self._json_temp_path = filepath + '.tmp' if output_format == 'json' else None
+
         self._thread = threading.Thread(target=self._writer_loop, daemon=True)
         self._thread.start()
-    
+
     def _writer_loop(self):
         buffer = []
         last_flush = time.time()
-        
+
         while not self._stop_event.is_set() or not self._queue.empty():
             try:
                 item = self._queue.get(timeout=0.1)
                 buffer.append(item)
-                
+
                 if len(buffer) >= self.buffer_size or (time.time() - last_flush > 2 and buffer):
                     self._flush(buffer)
                     buffer = []
@@ -322,72 +335,101 @@ class AsyncFileWriter:
                     self._flush(buffer)
                     buffer = []
                     last_flush = time.time()
-        
+
         if buffer:
             self._flush(buffer)
-    
+
     def _flush(self, buffer: List[DataItem]):
         if not buffer:
             return
-        
+
         try:
             if self.format == "jsonl":
                 mode = 'a' if os.path.exists(self.filepath) else 'w'
                 with open(self.filepath, mode, encoding='utf-8', buffering=65536) as f:
                     for item in buffer:
                         f.write(item.to_json() + '\n')
-            else:
-                # For JSON/CSV, accumulate items
-                self._all_items.extend([item.to_dict() for item in buffer])
-            
+
+            elif self.format == "csv":
+                # Stream CSV: write header on first batch, then append rows
+                dicts = [item.to_dict() for item in buffer]
+                flat_dicts = [self._flatten(d) for d in dicts]
+
+                if not self._csv_headers_written:
+                    self._csv_fieldnames = list(flat_dicts[0].keys())
+                    with open(self.filepath, 'w', newline='', encoding='utf-8') as f:
+                        writer = csv.DictWriter(f, fieldnames=self._csv_fieldnames)
+                        writer.writeheader()
+                        writer.writerows(flat_dicts)
+                    self._csv_headers_written = True
+                else:
+                    with open(self.filepath, 'a', newline='', encoding='utf-8') as f:
+                        writer = csv.DictWriter(f, fieldnames=self._csv_fieldnames, extrasaction='ignore')
+                        writer.writerows(flat_dicts)
+
+            elif self.format == "json":
+                # Stream JSON: write each item as a JSON line to temp file
+                # We'll assemble the final JSON array on stop()
+                mode = 'a' if os.path.exists(self._json_temp_path) else 'w'
+                with open(self._json_temp_path, mode, encoding='utf-8', buffering=65536) as f:
+                    for item in buffer:
+                        f.write(json.dumps(item.to_dict(), ensure_ascii=False) + '\n')
+                        self._json_count += 1
+
             self._written.increment(len(buffer))
         except Exception as e:
             print(f"\n?????? Write error: {e}")
-    
+
+    @staticmethod
+    def _flatten(d: dict) -> dict:
+        """Flatten nested dicts for CSV output."""
+        flat = {}
+        for k, v in d.items():
+            if isinstance(v, dict):
+                for k2, v2 in v.items():
+                    flat[f"{k}_{k2}"] = v2
+            else:
+                flat[k] = v
+        return flat
+
     def write(self, item: DataItem):
         try:
             self._queue.put_nowait(item)
         except queue.Full:
             time.sleep(0.05)
             self._queue.put(item)
-    
+
     def write_batch(self, items: List[DataItem]):
         for item in items:
             self.write(item)
-    
+
     def stop(self):
         self._stop_event.set()
         self._thread.join(timeout=10)
-        
-        # Write accumulated items for JSON/CSV
-        if self.format == "json" and self._all_items:
-            with open(self.filepath, 'w', encoding='utf-8') as f:
-                json.dump(self._all_items, f, indent=2, ensure_ascii=False)
-        elif self.format == "csv" and self._all_items:
-            self._write_csv()
-    
-    def _write_csv(self):
-        if not self._all_items:
-            return
-        
-        # Flatten nested dicts for CSV
-        flat_items = []
-        for item in self._all_items:
-            flat = {}
-            for k, v in item.items():
-                if isinstance(v, dict):
-                    for k2, v2 in v.items():
-                        flat[f"{k}_{k2}"] = v2
-                else:
-                    flat[k] = v
-            flat_items.append(flat)
-        
-        fieldnames = list(flat_items[0].keys())
-        with open(self.filepath, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(flat_items)
-    
+
+        # For JSON format: assemble temp lines into a proper JSON array
+        if self.format == "json" and self._json_temp_path and os.path.exists(self._json_temp_path):
+            try:
+                with open(self._json_temp_path, 'r', encoding='utf-8') as tmp:
+                    with open(self.filepath, 'w', encoding='utf-8') as out:
+                        out.write('[\n')
+                        first = True
+                        for line in tmp:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            if not first:
+                                out.write(',\n')
+                            out.write(line)
+                            first = False
+                        out.write('\n]')
+                os.remove(self._json_temp_path)
+            except Exception as e:
+                print(f"\n?????? JSON assembly error: {e}")
+                # Fallback: keep the temp file as-is
+                if os.path.exists(self._json_temp_path):
+                    os.rename(self._json_temp_path, self.filepath)
+
     def get_written_count(self) -> int:
         return self._written.get()
 
@@ -585,6 +627,50 @@ class MockBackend(BaseModelBackend):
         return "\n".join(items)
 
 
+class ProviderBackend(BaseModelBackend):
+    """
+    Backend that wraps the new provider abstraction layer.
+    Used for providers beyond HuggingFace/OpenAI/Mock (Anthropic, Google, Ollama, etc.).
+    """
+
+    def __init__(self, config: GeneratorConfig, provider_name: str):
+        self.config = config
+        self.provider_name = provider_name
+        self._provider = None
+
+    def load(self):
+        try:
+            from providers.factory import get_provider
+            from providers.base import GenerationRequest
+            self._provider = get_provider(self.provider_name)
+            self._GenerationRequest = GenerationRequest
+            print(f"??? Provider '{self.provider_name}' loaded ({self._provider.name})")
+        except ImportError:
+            raise ImportError(
+                f"Provider abstraction layer not available. "
+                f"Ensure Pre-Work/providers/ directory exists."
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load provider '{self.provider_name}': {exc}")
+
+    def generate(self, prompt: str) -> str:
+        try:
+            request = self._GenerationRequest(
+                prompt=prompt,
+                max_new_tokens=self.config.max_new_tokens,
+                temperature=self.config.temperature,
+                model=self.config.model_name if self.provider_name != 'openai' else self.config.openai_model,
+            )
+            response = self._provider.generate(request)
+            return response.text
+        except Exception as e:
+            print(f"\n??? {self.provider_name} error: {e}")
+            return ""
+
+    def clear_cache(self):
+        pass
+
+
 def get_backend(config: GeneratorConfig) -> BaseModelBackend:
     """
     Factory function to get appropriate backend.
@@ -593,12 +679,32 @@ def get_backend(config: GeneratorConfig) -> BaseModelBackend:
     A factory keeps provider selection in one place, which makes it easier to add new
     providers later (e.g., Anthropic, Azure OpenAI, local llama.cpp, etc.).
     """
+    # Legacy backends (direct implementation, no provider abstraction)
     if config.provider == ModelProvider.HUGGINGFACE:
         return HuggingFaceBackend(config)
     elif config.provider == ModelProvider.OPENAI:
         return OpenAIBackend(config)
-    else:
+    elif config.provider == ModelProvider.MOCK:
         return MockBackend(config)
+
+    # New providers go through the provider abstraction layer
+    provider_name_map = {
+        ModelProvider.ANTHROPIC: 'anthropic',
+        ModelProvider.GOOGLE: 'google',
+        ModelProvider.OLLAMA: 'ollama',
+        ModelProvider.AZURE_OPENAI: 'azure_openai',
+        ModelProvider.GROQ: 'groq',
+        ModelProvider.TOGETHER: 'together',
+        ModelProvider.CUSTOM: 'custom',
+        ModelProvider.AWS_BEDROCK: 'aws_bedrock',
+        ModelProvider.REPLICATE: 'replicate',
+    }
+    provider_name = provider_name_map.get(config.provider)
+    if provider_name:
+        return ProviderBackend(config, provider_name)
+
+    # Fallback
+    return MockBackend(config)
 
 
 # ============================================================================
@@ -1268,7 +1374,10 @@ Examples:
     parser.add_argument("--checkpoint", type=str, default="generator_checkpoint.json",
                        help="Checkpoint file path")
     parser.add_argument("--batch", "-b", type=int, default=10, help="Items per batch")
-    parser.add_argument("--provider", type=str, choices=["huggingface", "openai", "mock"],
+    parser.add_argument("--provider", type=str,
+                       choices=["huggingface", "openai", "mock", "anthropic", "google",
+                                "ollama", "azure_openai", "groq", "together", "custom",
+                                "aws_bedrock", "replicate"],
                        default="huggingface", help="Model provider")
     parser.add_argument("--model", type=str, help="Model name (for HuggingFace)")
     parser.add_argument("--fields", type=str, help="Comma-separated fields for JSON mode")
