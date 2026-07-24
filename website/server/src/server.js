@@ -60,6 +60,39 @@ const logger = pino({
 
 const db = initDatabase(config);
 
+// --- SaaS Platform: Extended schema & services ---
+const { applyExtendedSchema, migrateJobsTable } = require('./services/schemaExtensions');
+const { UserService } = require('./services/userService');
+const { SubscriptionService } = require('./services/subscriptionService');
+const { UsageService } = require('./services/usageService');
+const { ApiKeyService } = require('./services/apiKeyService');
+const { FeatureFlagService } = require('./services/featureFlagService');
+const { PluginService } = require('./services/pluginService');
+const { AnalyticsService } = require('./services/analyticsService');
+const { cache } = require('./services/cacheService');
+const { createAuthMiddleware } = require('./middleware/auth');
+const { createUsageTracker, createJobCreationTracker, createDownloadTracker } = require('./middleware/usage');
+const { errorHandler } = require('./utils/errors');
+const { createAuthRoutes } = require('./routes/authRoutes');
+const { createAdminRoutes } = require('./routes/adminRoutes');
+const { createBillingRoutes } = require('./routes/billingRoutes');
+const { createApiKeyRoutes } = require('./routes/apiKeyRoutes');
+const { createPluginRoutes } = require('./routes/pluginRoutes');
+const { createAnalyticsRoutes } = require('./routes/analyticsRoutes');
+
+if (config.enableSaaS) {
+  applyExtendedSchema(db);
+  migrateJobsTable(db);
+}
+
+const userService = config.enableSaaS ? new UserService(db) : null;
+const subscriptionService = config.enableSaaS ? new SubscriptionService(db) : null;
+const usageService = config.enableSaaS ? new UsageService(db) : null;
+const apiKeyService = config.enableSaaS ? new ApiKeyService(db) : null;
+const featureFlagService = config.enableSaaS ? new FeatureFlagService(db) : null;
+const pluginService = config.enableSaaS ? new PluginService(db) : null;
+const analyticsService = config.enableSaaS ? new AnalyticsService(db) : null;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -429,6 +462,64 @@ const createApp = () => {
   app.use(authMiddleware);
   app.use('/api', generalLimiter);
 
+  // --- SaaS Platform: auth, usage tracking, and extended routes ---
+  if (config.enableSaaS) {
+    const saasAuth = createAuthMiddleware({
+      jwtSecret: config.jwtSecret,
+      apiKeyService,
+      legacyApiKeys: config.apiKeys,
+      authMode: config.authMode,
+    });
+    app.use(saasAuth);
+
+    if (config.enableUsageTracking) {
+      app.use('/api', createUsageTracker(usageService));
+    }
+
+    app.use('/api/auth', createAuthRoutes({
+      userService,
+      subscriptionService,
+      jwtSecret: config.jwtSecret,
+      jwtExpiresIn: config.jwtExpiresIn,
+    }));
+
+    app.use('/api/admin', createAdminRoutes({
+      userService,
+      subscriptionService,
+      analyticsService,
+      featureFlagService,
+      pluginService,
+      usageService,
+    }));
+
+    app.use('/api/billing', createBillingRoutes({
+      subscriptionService,
+      usageService,
+      analyticsService,
+    }));
+
+    app.use('/api/api-keys', createApiKeyRoutes({
+      apiKeyService,
+      subscriptionService,
+      analyticsService,
+    }));
+
+    app.use('/api/plugins', createPluginRoutes({
+      pluginService,
+      featureFlagService,
+    }));
+
+    app.use('/api/analytics', createAnalyticsRoutes({
+      analyticsService,
+      usageService,
+    }));
+
+    // Subscription tiers (public)
+    app.get('/api/tiers', (_req, res) => {
+      res.json({ tiers: subscriptionService.getAllTiers() });
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Health & Info
   // -------------------------------------------------------------------------
@@ -440,6 +531,8 @@ const createApp = () => {
       sqlitePath: config.sqlitePath,
       outputsDir: config.outputsDir,
       version: '2.0.0',
+      saas: config.enableSaaS,
+      cacheStats: cache.getStats(),
     });
   });
 
@@ -1129,10 +1222,7 @@ const createApp = () => {
   // Error Handler
   // -------------------------------------------------------------------------
 
-  app.use((error, _req, res, _next) => {
-    logger.error({ err: error }, 'Unhandled server error');
-    res.status(500).json({ error: 'Internal server error' });
-  });
+  app.use(errorHandler);
 
   return app;
 };
@@ -1198,4 +1288,12 @@ module.exports = {
   start,
   db,
   logger,
+  userService,
+  subscriptionService,
+  usageService,
+  apiKeyService,
+  featureFlagService,
+  pluginService,
+  analyticsService,
+  cache,
 };
