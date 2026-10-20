@@ -198,9 +198,7 @@ export const api = {
     return handleResponse(response);
   },
 
-  // -----------------------------------------------------------------------
-  // Auth
-  // -----------------------------------------------------------------------
+  // --- Auth ---
 
   register: async ({ email, username, password, displayName }) => {
     const response = await fetch(`${API_BASE}/auth/register`, {
@@ -245,9 +243,7 @@ export const api = {
     return handleResponse(response);
   },
 
-  // -----------------------------------------------------------------------
-  // Billing & Subscriptions
-  // -----------------------------------------------------------------------
+  // --- Billing & Subscriptions ---
 
   getTiers: async () => {
     const response = await fetch(`${API_BASE}/tiers`);
@@ -284,9 +280,7 @@ export const api = {
     return handleResponse(response);
   },
 
-  // -----------------------------------------------------------------------
-  // API Keys
-  // -----------------------------------------------------------------------
+  // --- API Keys ---
 
   listApiKeys: async () => {
     const response = await fetch(`${API_BASE}/api-keys`, {
@@ -312,9 +306,7 @@ export const api = {
     return handleResponse(response);
   },
 
-  // -----------------------------------------------------------------------
-  // Plugins
-  // -----------------------------------------------------------------------
+  // --- Plugins ---
 
   listPlugins: async () => {
     const response = await fetch(`${API_BASE}/plugins`);

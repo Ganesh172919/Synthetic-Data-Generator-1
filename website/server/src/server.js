@@ -60,9 +60,7 @@ const logger = pino({
 
 const db = initDatabase(config);
 
-// ---------------------------------------------------------------------------
-// SaaS Platform: Extended schema & services
-// ---------------------------------------------------------------------------
+// --- SaaS Platform: Extended schema & services ---
 const { applyExtendedSchema, migrateJobsTable } = require('./services/schemaExtensions');
 const { UserService } = require('./services/userService');
 const { SubscriptionService } = require('./services/subscriptionService');
@@ -464,10 +462,7 @@ const createApp = () => {
   app.use(authMiddleware);
   app.use('/api', generalLimiter);
 
-  // -------------------------------------------------------------------------
-  // SaaS Platform: auth, usage tracking, and extended routes
-  // -------------------------------------------------------------------------
-
+  // --- SaaS Platform: auth, usage tracking, and extended routes ---
   if (config.enableSaaS) {
     const saasAuth = createAuthMiddleware({
       jwtSecret: config.jwtSecret,
