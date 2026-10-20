@@ -1,0 +1,22 @@
+name: Python CI
+
+on:
+  push:
+    paths: ["worker/**", "Pre-Work/**", "tests/**", ".github/workflows/python.yml"]
+  pull_request:
+    paths: ["worker/**", "Pre-Work/**", "tests/**", ".github/workflows/python.yml"]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install lightweight mock dependencies
+        run: pip install tqdm openai
+      - name: Compile worker and generator
+        run: python -m py_compile worker/main.py Pre-Work/universal_dataset_generator.py
+      - name: Verify mock generation without Torch
+        run: python -m unittest discover -s tests -v

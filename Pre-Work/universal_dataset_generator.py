@@ -525,9 +525,8 @@ class HuggingFaceBackend(BaseModelBackend):
         
         print(f"??? Model loaded successfully!")
     
-    @torch.inference_mode()
     def generate(self, prompt: str) -> str:
-        with self._lock:
+        with self._lock, torch.inference_mode():
             try:
                 # Many instruct-tuned models (including Mistral Instruct) use an [INST] wrapper.
                 # If you swap models, you may need to adjust this formatting to match the model's chat template.
